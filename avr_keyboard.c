@@ -76,9 +76,32 @@ ISR(INTERRUPT_FUNCTION) {
       key_release(key);
     key_status[key].release >>= 1;
   }
-  update_leds();
+//  update_leds();
   if(mod_keys == (uint8_t)(KEY_LEFT_SHIFT | KEY_RIGHT_SHIFT))
     jump_bootloader();
+}
+
+
+#define CLOCK 16000000UL
+#define SCALE 125
+static unsigned short _scale = 0;
+static volatile unsigned long _system_tick_count;
+static volatile unsigned long _tick_count;
+static volatile unsigned long _time_s;
+static unsigned short _time_ms;
+SIGNAL(TIMER0_OVF_vect)
+{
+	_system_tick_count++;
+	_scale += 16;
+	if (_scale >= SCALE) {
+		_scale -= SCALE;
+		_tick_count++;
+		_time_ms++;
+		if (_time_ms >= 1000) {
+			_time_ms = 0;
+			_time_s++;
+		}
+	}
 }
 
 int main(void) {
@@ -91,6 +114,12 @@ int main(void) {
     previous[key] = 0;
 
   for(;;) {
+    if (_time_ms < 500) {
+      PORTC |= 0x04;
+    } else {
+      PORTC &= ~0x04;
+    }
+
     // Pull one column at a time high/low, 
     // register which rows are affected.
     for(col = 0, key = 0; col < NCOL; col++) {
@@ -132,7 +161,7 @@ void send(void) {
   for(i=0; i<6; i++)
     keyboard_keys[i] = queue[i]<255? layout[queue[i]].value: 0;
   keyboard_modifier_keys = mod_keys;
-  usb_keyboard_send();
+//  usb_keyboard_send();
 }
 
 /* */
@@ -169,6 +198,12 @@ void key_release(uint8_t key) {
 /* Call initialization functions */
 void init(void) {
   uint8_t key;
+
+PORTC = 0x00;
+DDRC = 0x04;
+TCCR0B = 0x02; // 1/8 prescaling
+TIMSK0 |= 1 << TOIE0;
+
   // 16 MHz clock
   CLKPR = 0x80; CLKPR = 0;
   // Disable JTAG
@@ -176,9 +211,9 @@ void init(void) {
   usb_init();
   while(!usb_configured())
     _delay_ms(100);
-  setup_io_pins();
-  setup_leds();
-  setup_bounce_timer();
+//  setup_io_pins();
+//  setup_leds();
+//  setup_bounce_timer();
   mod_keys = 0;
   for(key = 0; key < NKEY; key++) {
     key_status[key].pressed = false;

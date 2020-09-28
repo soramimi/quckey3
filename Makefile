@@ -28,24 +28,24 @@
 #----------------------------------------------------------------------------
 
 # Keyboard type (with micro controller code and speed)
-BOARD = phantom
+#BOARD = phantom
 #LAYOUT = ansi_iso
-LAYOUT = ansi_iso_win
-MCU = atmega32u4
-F_CPU = 16000000
-B_LOADER = \"jmp\ 0x7E00\"
+#LAYOUT = ansi_iso_win
+#MCU = atmega32u4
+#F_CPU = 16000000
+#B_LOADER = \"jmp\ 0x7E00\"
 
 # BOARD = hid_liber
 # LAYOUT = ansi_iso_jis
-# MCU = atmega32u4
+# MCU = atmega32u2
 # F_CPU = 16000000
 # B_LOADER = \"jmp\ 0x7000\"
 
-#BOARD = test32u2
-#LAYOUT = test
-#MCU = atmega32u2
-#F_CPU = 16000000
-#B_LOADER = \"jmp\ 0x7000\"
+BOARD = .
+LAYOUT = test
+MCU = atmega32u2
+F_CPU = 16000000
+B_LOADER = \"jmp\ 0x7000\"
 
 #BOARD = sskb
 #LAYOUT = symmetric
@@ -63,9 +63,10 @@ B_LOADER = \"jmp\ 0x7E00\"
 # List C source files here.
 SRC =	avr_keyboard.c \
 	usb_keyboard_debug.c \
-	print.c \
 	$(BOARD)/board.c \
 	$(BOARD)/$(LAYOUT).c
+
+#	print.c \
 
 # Place -D or -U options here for C sources
 CDEFS = -DF_CPU=$(F_CPU)UL -D__INCLUDE_KEYBOARD=\"$(BOARD)/board.h\" -D__INCLUDE_LAYOUT=\"$(BOARD)/$(LAYOUT).h\" -D__BOOTLOADER_JUMP=$(B_LOADER)
@@ -162,3 +163,7 @@ clean:
 -include $(shell mkdir .dep 2>/dev/null) $(wildcard .dep/*)
 
 .PHONY : build hex eep end clean
+
+write: avr_keyboard.hex
+	avrpi -w avr_keyboard.hex --avr-write-fuse-e f4 --avr-write-fuse-h d9 --avr-write-fuse-l 5e
+

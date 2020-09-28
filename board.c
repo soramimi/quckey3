@@ -22,6 +22,7 @@ inline void release_column(int col) {
   *col_port[col] |=  col_bit[col];
 }
 
+#if 0
 inline void update_leds() {
   PORTC = (PORTC & 0x8F) | ((keyboard_leds << 4) & 0x70);
   DDRC  = (DDRC  & 0x8F) | ((keyboard_leds << 4) & 0x70);
@@ -31,6 +32,7 @@ void setup_leds(void) {
   DDRC  &= 0x8F;
   PORTC &= 0x8F;
 }
+#endif
 
 void setup_io_pins(void) {
   uint8_t row, col;
@@ -44,6 +46,7 @@ void setup_io_pins(void) {
   }
 }
 
+#if 0
 /* Timer0 is used to call the debounce algorithm
    at regular intervals via an interrupt.
    The interrupt is triggered when the timer reaches 
@@ -64,3 +67,4 @@ void setup_bounce_timer(void) {
 void toggle_leds(void) {
   DDRC  = PORTC = ~DDRC;// & 0x8F;
 }
+#endif

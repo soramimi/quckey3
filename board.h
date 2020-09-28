@@ -1,14 +1,15 @@
-/* Pontus version Symmetric Stagger board parameters. */
+/* Breadboard test setup */
 
-#ifndef pontus_board_h__
-#define pontus_board_h__
+#ifndef bread_board_h__
+#define bread_board_h__
 
-#include "../avr.h"
-#include "../usb_keyboard.h"
+#include "avr.h"
+#include "usb_keyboard_debug.h"
+#include "print.h"
 
-/* HalfKay Bootloader
-   32768 = 0x8000, 32768-512 = 0x7E00 */
-#define BOOTLOADER_JUMP "jmp 0x7E00"
+/* LUFA/Atmel Bootloader
+   32768 = 0x8000, 32768-4096 = 0x7000 */
+#define BOOTLOADER_JUMP "jmp 0x7000"
 #define ACTIVE_LOW
 #define INTERRUPT_FUNCTION TIMER0_COMPA_vect
 #define SETTLE_TIME_US 1
@@ -24,8 +25,9 @@ void toggle_leds(void);
    NCOL number of columns
    NKEY = NROW*NCOL */
 #define NA    0
-#define NROW  6
-#define NCOL  18
-#define NKEY  108
+#define NROW  4
+#define NCOL  4
+#define NKEY  16
+
 
 #endif
