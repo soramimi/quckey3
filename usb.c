@@ -1,17 +1,17 @@
 /* USB Keyboard Plus Debug Channel Example for Teensy USB Development Board
  * http://www.pjrc.com/teensy/usb_keyboard.html
  * Copyright (c) 2009 PJRC.COM, LLC
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -26,7 +26,7 @@
 // 2012-09-07: Added the bootload jump routine /Fredrik Atmer
 
 #define USB_SERIAL_PRIVATE_INCLUDE
-#include "usb_keyboard_debug.h"
+#include "usb.h"
 
 /**************************************************************************
  *
@@ -114,38 +114,38 @@ static const uint8_t PROGMEM device_descriptor[] = {
 
 // Keyboard Protocol 1, HID 1.11 spec, Appendix B, page 59-60
 static const uint8_t PROGMEM keyboard_hid_report_desc[] = {
-        0x05, 0x01,          // Usage Page (Generic Desktop),
-        0x09, 0x06,          // Usage (Keyboard),
-        0xA1, 0x01,          // Collection (Application),
-        0x75, 0x01,          //   Report Size (1),
-        0x95, 0x08,          //   Report Count (8),
-        0x05, 0x07,          //   Usage Page (Key Codes),
-        0x19, 0xE0,          //   Usage Minimum (224),
-        0x29, 0xE7,          //   Usage Maximum (231),
-        0x15, 0x00,          //   Logical Minimum (0),
-        0x25, 0x01,          //   Logical Maximum (1),
-        0x81, 0x02,          //   Input (Data, Variable, Absolute), ;Modifier byte
-        0x95, 0x01,          //   Report Count (1),
-        0x75, 0x08,          //   Report Size (8),
-        0x81, 0x03,          //   Input (Constant),                 ;Reserved byte
-        0x95, 0x05,          //   Report Count (5),
-        0x75, 0x01,          //   Report Size (1),
-        0x05, 0x08,          //   Usage Page (LEDs),
-        0x19, 0x01,          //   Usage Minimum (1),
-        0x29, 0x05,          //   Usage Maximum (5),
-        0x91, 0x02,          //   Output (Data, Variable, Absolute), ;LED report
-        0x95, 0x01,          //   Report Count (1),
-        0x75, 0x03,          //   Report Size (3),
-        0x91, 0x03,          //   Output (Constant),                 ;LED report padding
-        0x95, 0x06,          //   Report Count (6),
-        0x75, 0x08,          //   Report Size (8),
-        0x15, 0x00,          //   Logical Minimum (0),
-        0x25, 0x68,          //   Logical Maximum(104),
-        0x05, 0x07,          //   Usage Page (Key Codes),
-        0x19, 0x00,          //   Usage Minimum (0),
-        0x29, 0x68,          //   Usage Maximum (104),
-        0x81, 0x00,          //   Input (Data, Array),
-        0xc0                 // End Collection
+	0x05, 0x01,          // Usage Page (Generic Desktop),
+	0x09, 0x06,          // Usage (Keyboard),
+	0xA1, 0x01,          // Collection (Application),
+	0x75, 0x01,          //   Report Size (1),
+	0x95, 0x08,          //   Report Count (8),
+	0x05, 0x07,          //   Usage Page (Key Codes),
+	0x19, 0xE0,          //   Usage Minimum (224),
+	0x29, 0xE7,          //   Usage Maximum (231),
+	0x15, 0x00,          //   Logical Minimum (0),
+	0x25, 0x01,          //   Logical Maximum (1),
+	0x81, 0x02,          //   Input (Data, Variable, Absolute), ;Modifier byte
+	0x95, 0x01,          //   Report Count (1),
+	0x75, 0x08,          //   Report Size (8),
+	0x81, 0x03,          //   Input (Constant),                 ;Reserved byte
+	0x95, 0x05,          //   Report Count (5),
+	0x75, 0x01,          //   Report Size (1),
+	0x05, 0x08,          //   Usage Page (LEDs),
+	0x19, 0x01,          //   Usage Minimum (1),
+	0x29, 0x05,          //   Usage Maximum (5),
+	0x91, 0x02,          //   Output (Data, Variable, Absolute), ;LED report
+	0x95, 0x01,          //   Report Count (1),
+	0x75, 0x03,          //   Report Size (3),
+	0x91, 0x03,          //   Output (Constant),                 ;LED report padding
+	0x95, 0x06,          //   Report Count (6),
+	0x75, 0x08,          //   Report Size (8),
+	0x15, 0x00,          //   Logical Minimum (0),
+	0x25, 0x68,          //   Logical Maximum(104),
+	0x05, 0x07,          //   Usage Page (Key Codes),
+	0x19, 0x00,          //   Usage Minimum (0),
+	0x29, 0x68,          //   Usage Maximum (104),
+	0x81, 0x00,          //   Input (Data, Array),
+	0xc0                 // End Collection
 };
 
 static const uint8_t PROGMEM debug_hid_report_desc[] = {
@@ -240,7 +240,7 @@ struct usb_string_descriptor_struct {
 static const struct usb_string_descriptor_struct PROGMEM string0 = {
 	4,
 	3,
-	{0x0409}
+{0x0409}
 };
 static const struct usb_string_descriptor_struct PROGMEM string1 = {
 	sizeof(STR_MANUFACTURER),
@@ -261,15 +261,15 @@ static struct descriptor_list_struct {
 	const uint8_t	*addr;
 	uint8_t		length;
 } PROGMEM const descriptor_list[] = {
-	{0x0100, 0x0000, device_descriptor, sizeof(device_descriptor)},
-	{0x0200, 0x0000, config1_descriptor, sizeof(config1_descriptor)},
-	{0x2200, KEYBOARD_INTERFACE, keyboard_hid_report_desc, sizeof(keyboard_hid_report_desc)},
-	{0x2100, KEYBOARD_INTERFACE, config1_descriptor+KEYBOARD_HID_DESC_OFFSET, 9},
-	{0x2200, DEBUG_INTERFACE, debug_hid_report_desc, sizeof(debug_hid_report_desc)},
-	{0x2100, DEBUG_INTERFACE, config1_descriptor+DEBUG_HID_DESC_OFFSET, 9},
-	{0x0300, 0x0000, (const uint8_t *)&string0, 4},
-	{0x0301, 0x0409, (const uint8_t *)&string1, sizeof(STR_MANUFACTURER)},
-	{0x0302, 0x0409, (const uint8_t *)&string2, sizeof(STR_PRODUCT)}
+{0x0100, 0x0000, device_descriptor, sizeof(device_descriptor)},
+{0x0200, 0x0000, config1_descriptor, sizeof(config1_descriptor)},
+{0x2200, KEYBOARD_INTERFACE, keyboard_hid_report_desc, sizeof(keyboard_hid_report_desc)},
+{0x2100, KEYBOARD_INTERFACE, config1_descriptor+KEYBOARD_HID_DESC_OFFSET, 9},
+{0x2200, DEBUG_INTERFACE, debug_hid_report_desc, sizeof(debug_hid_report_desc)},
+{0x2100, DEBUG_INTERFACE, config1_descriptor+DEBUG_HID_DESC_OFFSET, 9},
+{0x0300, 0x0000, (const uint8_t *)&string0, 4},
+{0x0301, 0x0409, (const uint8_t *)&string1, sizeof(STR_MANUFACTURER)},
+{0x0302, 0x0409, (const uint8_t *)&string2, sizeof(STR_PRODUCT)}
 };
 #define NUM_DESC_LIST (sizeof(descriptor_list)/sizeof(struct descriptor_list_struct))
 
@@ -319,22 +319,22 @@ volatile uint8_t keyboard_leds=0;
 
 
 // initialize USB
-void usb_init(void)
+void usb_init()
 {
 	HW_CONFIG();
 	USB_FREEZE();				// enable USB
 	PLL_CONFIG();				// config PLL
-        while (!(PLLCSR & (1<<PLOCK))) ;	// wait for PLL lock
-        USB_CONFIG();				// start USB clock
-        UDCON = 0;				// enable attach resistor
+	while (!(PLLCSR & (1<<PLOCK))) ;	// wait for PLL lock
+	USB_CONFIG();				// start USB clock
+	UDCON = 0;				// enable attach resistor
 	usb_configuration = 0;
-        UDIEN = (1<<EORSTE)|(1<<SOFE);
+	UDIEN = (1<<EORSTE)|(1<<SOFE);
 	sei();
 }
 
 // return 0 if the USB is not configured, or the configuration
 // number selected by the HOST
-uint8_t usb_configured(void)
+uint8_t usb_configured()
 {
 	return usb_configuration;
 }
@@ -355,7 +355,7 @@ int8_t usb_keyboard_press(uint8_t key, uint8_t modifier)
 }
 
 // send the contents of keyboard_keys and keyboard_modifier_keys
-int8_t usb_keyboard_send(void)
+int8_t usb_keyboard_send()
 {
 	uint8_t i, intr_state, timeout;
 
@@ -388,44 +388,45 @@ int8_t usb_keyboard_send(void)
 	return 0;
 }
 
-void jump_bootloader(void) {
-  cli();
-  UDCON = 1;
-  USBCON = (1<<FRZCLK);  // disable USB
-  UCSR1B = 0;
-  _delay_ms(5);
-  // ATmega32u2
+void jump_bootloader()
+{
+	cli();
+	UDCON = 1;
+	USBCON = (1<<FRZCLK);  // disable USB
+	UCSR1B = 0;
+	_delay_ms(5);
+	// ATmega32u2
 #if defined(__AVR_ATmega32U2__)
-  EIMSK = 0; PCICR = 0; SPCR = 0; ACSR = 0; EECR = 0;
-  TIMSK0 = 0; TIMSK1 = 0; UCSR1B = 0;
-  DDRB = 0; DDRC = 0; DDRD = 0;
-  PORTB = 0; PORTC = 0; PORTD = 0;
-  // ATmega32u4, Teensy 2.0 
+	EIMSK = 0; PCICR = 0; SPCR = 0; ACSR = 0; EECR = 0;
+	TIMSK0 = 0; TIMSK1 = 0; UCSR1B = 0;
+	DDRB = 0; DDRC = 0; DDRD = 0;
+	PORTB = 0; PORTC = 0; PORTD = 0;
+	// ATmega32u4, Teensy 2.0
 #elif defined(__AVR_ATmega32U4__)
-  EIMSK = 0; PCICR = 0; SPCR = 0; ACSR = 0; EECR = 0; ADCSRA = 0;
-  TIMSK0 = 0; TIMSK1 = 0; TIMSK3 = 0; TIMSK4 = 0; UCSR1B = 0; TWCR = 0;
-  DDRB = 0; DDRC = 0; DDRD = 0; DDRE = 0; DDRF = 0; TWCR = 0;
-  PORTB = 0; PORTC = 0; PORTD = 0; PORTE = 0; PORTF = 0;
-  // AT90USB162, Teensy 1.0
+	EIMSK = 0; PCICR = 0; SPCR = 0; ACSR = 0; EECR = 0; ADCSRA = 0;
+	TIMSK0 = 0; TIMSK1 = 0; TIMSK3 = 0; TIMSK4 = 0; UCSR1B = 0; TWCR = 0;
+	DDRB = 0; DDRC = 0; DDRD = 0; DDRE = 0; DDRF = 0; TWCR = 0;
+	PORTB = 0; PORTC = 0; PORTD = 0; PORTE = 0; PORTF = 0;
+	// AT90USB162, Teensy 1.0
 #elif defined(__AVR_AT90USB162__)
-  EIMSK = 0; PCICR = 0; SPCR = 0; ACSR = 0; EECR = 0;
-  TIMSK0 = 0; TIMSK1 = 0; UCSR1B = 0;
-  DDRB = 0; DDRC = 0; DDRD = 0;
-  PORTB = 0; PORTC = 0; PORTD = 0;
-  // AT90USB646, Teensy++ 1.0
+	EIMSK = 0; PCICR = 0; SPCR = 0; ACSR = 0; EECR = 0;
+	TIMSK0 = 0; TIMSK1 = 0; UCSR1B = 0;
+	DDRB = 0; DDRC = 0; DDRD = 0;
+	PORTB = 0; PORTC = 0; PORTD = 0;
+	// AT90USB646, Teensy++ 1.0
 #elif defined(__AVR_AT90USB646__)
-  EIMSK = 0; PCICR = 0; SPCR = 0; ACSR = 0; EECR = 0; ADCSRA = 0;
-  TIMSK0 = 0; TIMSK1 = 0; TIMSK2 = 0; TIMSK3 = 0; UCSR1B = 0; TWCR = 0;
-  DDRA = 0; DDRB = 0; DDRC = 0; DDRD = 0; DDRE = 0; DDRF = 0;
-  PORTA = 0; PORTB = 0; PORTC = 0; PORTD = 0; PORTE = 0; PORTF = 0;
-  // AT90USB1286, Teensy++ 2.0 
+	EIMSK = 0; PCICR = 0; SPCR = 0; ACSR = 0; EECR = 0; ADCSRA = 0;
+	TIMSK0 = 0; TIMSK1 = 0; TIMSK2 = 0; TIMSK3 = 0; UCSR1B = 0; TWCR = 0;
+	DDRA = 0; DDRB = 0; DDRC = 0; DDRD = 0; DDRE = 0; DDRF = 0;
+	PORTA = 0; PORTB = 0; PORTC = 0; PORTD = 0; PORTE = 0; PORTF = 0;
+	// AT90USB1286, Teensy++ 2.0
 #elif defined(__AVR_AT90USB1286__)
-  EIMSK = 0; PCICR = 0; SPCR = 0; ACSR = 0; EECR = 0; ADCSRA = 0;
-  TIMSK0 = 0; TIMSK1 = 0; TIMSK2 = 0; TIMSK3 = 0; UCSR1B = 0; TWCR = 0;
-  DDRA = 0; DDRB = 0; DDRC = 0; DDRD = 0; DDRE = 0; DDRF = 0;
-  PORTA = 0; PORTB = 0; PORTC = 0; PORTD = 0; PORTE = 0; PORTF = 0;
+	EIMSK = 0; PCICR = 0; SPCR = 0; ACSR = 0; EECR = 0; ADCSRA = 0;
+	TIMSK0 = 0; TIMSK1 = 0; TIMSK2 = 0; TIMSK3 = 0; UCSR1B = 0; TWCR = 0;
+	DDRA = 0; DDRB = 0; DDRC = 0; DDRD = 0; DDRE = 0; DDRF = 0;
+	PORTA = 0; PORTB = 0; PORTC = 0; PORTD = 0; PORTE = 0; PORTF = 0;
 #endif
-  asm volatile(__BOOTLOADER_JUMP);
+	asm volatile(__BOOTLOADER_JUMP);
 }
 
 // transmit a character.  0 returned on success, -1 on error
@@ -483,7 +484,7 @@ int8_t usb_debug_putchar(uint8_t c)
 
 
 // immediately transmit any buffered output.
-void usb_debug_flush_output(void)
+void usb_debug_flush_output()
 {
 	uint8_t intr_state;
 
@@ -518,16 +519,16 @@ ISR(USB_GEN_vect)
 	uint8_t intbits, t, i;
 	static uint8_t div4=0;
 
-        intbits = UDINT;
-        UDINT = 0;
-        if (intbits & (1<<EORSTI)) {
+	intbits = UDINT;
+	UDINT = 0;
+	if (intbits & (1<<EORSTI)) {
 		UENUM = 0;
 		UECONX = 1;
 		UECFG0X = EP_TYPE_CONTROL;
 		UECFG1X = EP_SIZE(ENDPOINT0_SIZE) | EP_SINGLE_BUFFER;
 		UEIENX = (1<<RXSTPE);
 		usb_configuration = 0;
-        }
+	}
 	if ((intbits & (1<<SOFI)) && usb_configuration) {
 		t = debug_flush_timer;
 		if (t) {
@@ -561,19 +562,19 @@ ISR(USB_GEN_vect)
 
 
 // Misc functions to wait for ready and send/receive packets
-static inline void usb_wait_in_ready(void)
+static inline void usb_wait_in_ready()
 {
 	while (!(UEINTX & (1<<TXINI))) ;
 }
-static inline void usb_send_in(void)
+static inline void usb_send_in()
 {
 	UEINTX = ~(1<<TXINI);
 }
-static inline void usb_wait_receive_out(void)
+static inline void usb_wait_receive_out()
 {
 	while (!(UEINTX & (1<<RXOUTI))) ;
 }
-static inline void usb_ack_out(void)
+static inline void usb_ack_out()
 {
 	UEINTX = ~(1<<RXOUTI);
 }
@@ -586,9 +587,9 @@ static inline void usb_ack_out(void)
 //
 ISR(USB_COM_vect)
 {
-        uint8_t intbits;
+	uint8_t intbits;
 	const uint8_t *list;
-        const uint8_t *cfg;
+	const uint8_t *cfg;
 	uint8_t i, n, len, en;
 	uint8_t bmRequestType;
 	uint8_t bRequest;
@@ -599,19 +600,19 @@ ISR(USB_COM_vect)
 	const uint8_t *desc_addr;
 	uint8_t	desc_length;
 
-        UENUM = 0;
+	UENUM = 0;
 	intbits = UEINTX;
-        if (intbits & (1<<RXSTPI)) {
-                bmRequestType = UEDATX;
-                bRequest = UEDATX;
-                wValue = UEDATX;
-                wValue |= (UEDATX << 8);
-                wIndex = UEDATX;
-                wIndex |= (UEDATX << 8);
-                wLength = UEDATX;
-                wLength |= (UEDATX << 8);
-                UEINTX = ~((1<<RXSTPI) | (1<<RXOUTI) | (1<<TXINI));
-                if (bRequest == GET_DESCRIPTOR) {
+	if (intbits & (1<<RXSTPI)) {
+		bmRequestType = UEDATX;
+		bRequest = UEDATX;
+		wValue = UEDATX;
+		wValue |= (UEDATX << 8);
+		wIndex = UEDATX;
+		wIndex |= (UEDATX << 8);
+		wLength = UEDATX;
+		wLength |= (UEDATX << 8);
+		UEINTX = ~((1<<RXSTPI) | (1<<RXOUTI) | (1<<TXINI));
+		if (bRequest == GET_DESCRIPTOR) {
 			list = (const uint8_t *)descriptor_list;
 			for (i=0; ; i++) {
 				if (i >= NUM_DESC_LIST) {
@@ -652,7 +653,7 @@ ISR(USB_COM_vect)
 				usb_send_in();
 			} while (len || n == ENDPOINT0_SIZE);
 			return;
-                }
+		}
 		if (bRequest == SET_ADDRESS) {
 			usb_send_in();
 			usb_wait_in_ready();
@@ -672,8 +673,8 @@ ISR(USB_COM_vect)
 					UECFG1X = pgm_read_byte(cfg++);
 				}
 			}
-        		UERST = 0x1E;
-        		UERST = 0;
+			UERST = 0x1E;
+			UERST = 0;
 			return;
 		}
 		if (bRequest == GET_CONFIGURATION && bmRequestType == 0x80) {
@@ -686,21 +687,21 @@ ISR(USB_COM_vect)
 		if (bRequest == GET_STATUS) {
 			usb_wait_in_ready();
 			i = 0;
-			#ifdef SUPPORT_ENDPOINT_HALT
+#ifdef SUPPORT_ENDPOINT_HALT
 			if (bmRequestType == 0x82) {
 				UENUM = wIndex;
 				if (UECONX & (1<<STALLRQ)) i = 1;
 				UENUM = 0;
 			}
-			#endif
+#endif
 			UEDATX = i;
 			UEDATX = 0;
 			usb_send_in();
 			return;
 		}
-		#ifdef SUPPORT_ENDPOINT_HALT
+#ifdef SUPPORT_ENDPOINT_HALT
 		if ((bRequest == CLEAR_FEATURE || bRequest == SET_FEATURE)
-		  && bmRequestType == 0x02 && wValue == 0) {
+				&& bmRequestType == 0x02 && wValue == 0) {
 			i = wIndex & 0x7F;
 			if (i >= 1 && i <= MAX_ENDPOINT) {
 				usb_send_in();
@@ -715,7 +716,7 @@ ISR(USB_COM_vect)
 				return;
 			}
 		}
-		#endif
+#endif
 		if (wIndex == KEYBOARD_INTERFACE) {
 			if (bmRequestType == 0xA1) {
 				if (bRequest == HID_GET_REPORT) {

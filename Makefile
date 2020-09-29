@@ -61,10 +61,9 @@ B_LOADER = \"jmp\ 0x7000\"
 #B_LOADER = \"jmp\ 0x1FC00\"
 
 # List C source files here.
-SRC =	avr_keyboard.c \
-	usb_keyboard_debug.c \
-	$(BOARD)/board.c \
-	$(BOARD)/$(LAYOUT).c
+SRC =	main.c \
+	usb.c \
+	board.c
 
 #	print.c \
 
@@ -87,7 +86,6 @@ CFLAGS = $(CDEFS)
 CFLAGS += -O$(OPTLEVEL)
 CFLAGS += -ffunction-sections
 CFLAGS += -Wall
-CFLAGS += -Wstrict-prototypes
 CFLAGS += -Wa,-adhlns=$(<:%.c=%.lst)
 CFLAGS += -std=gnu99
 
