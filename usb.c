@@ -112,7 +112,7 @@ static const uint8_t PROGMEM device_descriptor[] = {
 	1					// bNumConfigurations
 };
 
-#if 0
+#if 1
 // Keyboard Protocol 1, HID 1.11 spec, Appendix B, page 59-60
 static const uint8_t PROGMEM keyboard_hid_report_desc[] = {
 	0x05, 0x01,          // Usage Page (Generic Desktop),
