@@ -122,7 +122,7 @@ void send()
 	//return;
 	uint8_t i;
 	for (i = 0; i < 6; i++) {
-		keyboard_keys[i] = queue[i] < 255 ? layout[queue[i]].value : 0;
+		keyboard_data[i] = queue[i] < 255 ? layout[queue[i]].value : 0;
 	}
 	keyboard_modifier_keys = mod_keys;
 	usb_keyboard_send();
@@ -243,6 +243,26 @@ int main()
 			release_column(col);
 		}
 #endif
+		if (1) {
+			_delay_ms(100);
+
+			memset(keyboard_data, 0, sizeof(keyboard_data));
+			keyboard_data[0] = 0x04;
+			usb_keyboard_send();
+			keyboard_data[0] = 0;
+			usb_keyboard_send();
+
+
+#if 1
+
+			mouse_data[0] = 0;
+			mouse_data[1] = 1;
+			mouse_data[2] = 1;
+			mouse_data[3] = 0;
+
+			usb_mouse_send();
+#endif
+		}
 	}
 }
 
