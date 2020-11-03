@@ -553,6 +553,7 @@ int8_t usb_mouse_send()
 	return 0;
 }
 
+#if 0
 void jump_bootloader()
 {
 	cli();
@@ -593,6 +594,7 @@ void jump_bootloader()
 #endif
 	asm volatile(__BOOTLOADER_JUMP);
 }
+#endif
 
 // transmit a character.  0 returned on success, -1 on error
 int8_t usb_debug_putchar(uint8_t c)

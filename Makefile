@@ -61,19 +61,18 @@ B_LOADER = \"jmp\ 0x7000\"
 #B_LOADER = \"jmp\ 0x1FC00\"
 
 # List C source files here.
-SRC =	main.c \
-	usb.c \
-	board.c
+#SRC =	main.c \
+#	usb.c \
+#	board.c
 
 #	print.c \
 
-# Place -D or -U options here for C sources
-CDEFS = -DF_CPU=$(F_CPU)UL -D__INCLUDE_KEYBOARD=\"$(BOARD)/board.h\" -D__INCLUDE_LAYOUT=\"$(BOARD)/$(LAYOUT).h\" -D__BOOTLOADER_JUMP=$(B_LOADER)
+#CDEFS = -DF_CPU=$(F_CPU)UL -D__INCLUDE_KEYBOARD=\"$(BOARD)/board.h\" -D__INCLUDE_LAYOUT=\"$(BOARD)/$(LAYOUT).h\" -D__BOOTLOADER_JUMP=$(B_LOADER)
 
 # Optimization level, can be [0, 1, 2, 3, s]. 
 #     0 = turn off optimization. s = optimize for size.
 #     (Note: 3 is not always the best optimization level. See avr-libc FAQ.)
-OPTLEVEL = 2
+#OPTLEVEL = 2
 
 #---------------- Compiler Options C ----------------
 #  -g*:          generate debugging information
@@ -82,12 +81,12 @@ OPTLEVEL = 2
 #  -Wall...:     warning level
 #  -Wa,...:      tell GCC to pass this to the assembler.
 #    -adhlns...: create assembler listing
-CFLAGS = $(CDEFS)
-CFLAGS += -O$(OPTLEVEL)
-CFLAGS += -ffunction-sections
-CFLAGS += -Wall
-CFLAGS += -Wa,-adhlns=$(<:%.c=%.lst)
-CFLAGS += -std=gnu99
+#CFLAGS = $(CDEFS)
+#CFLAGS += -O$(OPTLEVEL)
+#CFLAGS += -ffunction-sections
+#CFLAGS += -Wall
+#CFLAGS += -Wa,-adhlns=$(<:%.c=%.lst)
+#CFLAGS += -std=gnu99
 
 #---------------- Linker Options ----------------
 #  -Wl,...:     tell GCC to pass this to linker.
@@ -102,12 +101,21 @@ LDFLAGS += -lm
 SHELL = sh
 
 # Define all object files.
-OBJ = $(SRC:%.c=%.o)
+OBJ = \
+	board.o \
+	ps2dec.o \
+	ps2dec001.o \
+	ps2dec002.o \
+	ps2if.o \
+	quckey.o \
+	queue16.o \
+	usb.o \
+	main.o \
+	waitloop.o
 
-# Compiler flags to generate dependency files.
-GENDEPFLAGS = -MMD -MP -MF .dep/$(@F).d
-
-ALL_CFLAGS = -mmcu=$(MCU) -I. $(CFLAGS) $(GENDEPFLAGS)
+CFLAGS = -Os -mmcu=$(MCU) -DF_CPU=$(F_CPU)
+CC = avr-gcc $(CFLAGS) -std=gnu99
+CXX = avr-g++ $(CFLAGS) -std=c++11
 
 # Change the build target to build a HEX file or a library.
 build: avr_keyboard.hex avr_keyboard.eep end
@@ -134,13 +142,13 @@ build: avr_keyboard.hex avr_keyboard.eep end
 %.elf: $(OBJ)
 	@echo
 	@echo Linking: $@
-	avr-gcc $(ALL_CFLAGS) $^ --output $@ $(LDFLAGS)
+	avr-g++ -mmcu=$(MCU) $^ --output $@ $(LDFLAGS)
 
 # Compile: create object files from C source files.
-%.o : %.c
-	@echo
-	@echo Compiling C: $<
-	avr-gcc -c $(ALL_CFLAGS) $< -o $@ 
+#%.o : %.c
+#	@echo
+#	@echo Compiling C: $<
+#	avr-gcc -c $(ALL_CFLAGS) $< -o $@ 
 
 end: 
 	@echo

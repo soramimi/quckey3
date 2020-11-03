@@ -30,6 +30,7 @@
 #include "usb.h"
 #include "avr.h"
 #include "board.h"
+#include <string.h>
 //#include "print.h"
 //#include __INCLUDE_KEYBOARD
 //#include __INCLUDE_LAYOUT
@@ -102,7 +103,8 @@ static volatile unsigned long _system_tick_count;
 static volatile unsigned long _tick_count;
 static volatile unsigned long _time_s;
 static unsigned short _time_ms;
-ISR(TIMER0_OVF_vect)
+extern uint8_t quckey_timerevent;
+ISR(TIMER0_OVF_vect, ISR_NOBLOCK)
 {
 	_system_tick_count++;
 	_scale += 16;
@@ -111,6 +113,7 @@ ISR(TIMER0_OVF_vect)
 		_tick_count++;
 		_time_ms++;
 		if (_time_ms >= 1000) {
+			quckey_timerevent = 1;
 			_time_ms = 0;
 			_time_s++;
 		}
@@ -166,12 +169,26 @@ void key_release(uint8_t key)
 	send();
 }
 
+extern "C" void quckey_setup();
+extern "C" void quckey_loop();
+
+extern "C" void led(int f)
+{
+	if (f) {
+		PORTB |= 0x01;
+	} else {
+		PORTB &= ~0x01;
+	}
+}
+
 /* Call initialization functions */
 void init()
 {
 	uint8_t key;
 
+	PORTB = 0x00;
 	PORTC = 0x00;
+	DDRB = 0x01;
 	DDRC = 0x04;
 	TCCR0B = 0x02; // 1/8 prescaling
 	TIMSK0 |= 1 << TOIE0;
@@ -195,24 +212,31 @@ void init()
 	sei();  // Enable interrupts
 }
 
+
 int main()
 {
 	uint8_t previous[NKEY];
 
+	_delay_ms(300);
 	init();
+	_delay_ms(300);
+	quckey_setup();
+	_delay_ms(300);
 
 	for (int i = 0; i < NKEY; i++) {
 		previous[i] = 0;
 	}
 
+	sei();
+
 	while (1) {
+#if 0
 		if (_time_ms < 500) {
 			PORTC |= 0x04;
 		} else {
 			PORTC &= ~0x04;
 		}
 
-#if 0
 		uint8_t key, row, col;
 		// Pull one column at a time high/low,
 		// register which rows are affected.
@@ -244,6 +268,7 @@ int main()
 		}
 #endif
 		if (1) {
+#if 0
 			_delay_ms(100);
 
 			memset(keyboard_data, 0, sizeof(keyboard_data));
@@ -253,7 +278,6 @@ int main()
 			usb_keyboard_send();
 
 
-#if 1
 
 			mouse_data[0] = 0;
 			mouse_data[1] = 1;
@@ -263,6 +287,30 @@ int main()
 			usb_mouse_send();
 #endif
 		}
+		quckey_loop();
 	}
+}
+
+extern "C" void usb_put_a()
+{
+	memset(keyboard_data, 0, sizeof(keyboard_data));
+	keyboard_data[0] = 4;
+	usb_keyboard_send();
+	keyboard_data[0] = 0;
+	usb_keyboard_send();
+}
+
+extern "C" void usb_puthex(int c)
+{
+	static const char hex[] = "\x27\x1e\x1f\x20\x21\x22\x23\x24\x25\x26\x04\x05\x06\x07\x08\x09";
+	memset(keyboard_data, 0, sizeof(keyboard_data));
+	keyboard_data[0] = hex[(c >> 4) & 15];
+	usb_keyboard_send();
+	keyboard_data[0] = 0;
+	usb_keyboard_send();
+	keyboard_data[0] = hex[c & 15];
+	usb_keyboard_send();
+	keyboard_data[0] = 0;
+	usb_keyboard_send();
 }
 

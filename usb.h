@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <util/delay.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void usb_init(void);			// initialize everything
 uint8_t usb_configured(void);		// is the USB port configured
 
@@ -18,6 +22,12 @@ extern volatile uint8_t keyboard_leds;
 
 int8_t usb_debug_putchar(uint8_t c);	// transmit a character
 void usb_debug_flush_output(void);	// immediately transmit any buffered output
+
+
+#ifdef __cplusplus
+}
+#endif
+
 #define USB_DEBUG_HID
 
 #define KEY_CTRL        0x0101
