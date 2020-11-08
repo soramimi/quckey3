@@ -16,7 +16,16 @@ enum {
 	KEYFLAG_MAKE = 0x80,
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 unsigned short ps2decode(unsigned char *state, unsigned char c);
+
+#ifdef __cplusplus
+}
+#endif
+
 int ps2encode(unsigned char number, unsigned char keyflag, void (*output)(unsigned char c, void *cookie), void *cookie);
 
 unsigned short ps2decode001(unsigned char *state, unsigned char c);

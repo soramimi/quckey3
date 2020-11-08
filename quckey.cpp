@@ -28,16 +28,22 @@ Queue kb_output_queue;
 //Queue pc_input_queue;
 //Queue pc_output_queue;
 
-PS2KB1 ps2kb1;
-AbstractPS2IO *kb = &ps2kb1;
+PS2KB0 ps2kb0io;
+PS2KB1 ps2kb1io;
+class PS2Keyboard {
+public:
+	AbstractPS2IO *io;
+	unsigned short kb_input_bits;
+	unsigned short kb_output_bits;
+	unsigned char kb_timeout;
+	unsigned short repeat_timeout;
+};
 
-unsigned short kb_input_bits;
-unsigned short kb_output_bits;
-unsigned short pc_input_bits;
-unsigned short pc_output_bits;
+PS2Keyboard ps2kb0;
+PS2Keyboard ps2kb1;
 
-unsigned char kb_timeout;
-unsigned short repeat_timeout;
+PS2Keyboard *kb;
+
 
 
 
@@ -55,13 +61,13 @@ int countbits(unsigned short c)
 inline void initialize_kb_output()
 {
 	qinit(&kb_output_queue);
-	kb_output_bits = 0;
+	kb->kb_output_bits = 0;
 }
 
 inline void initialize_kb_input()
 {
 	qinit(&kb_input_queue);
-	kb_input_bits = 0;
+	kb->kb_input_bits = 0;
 }
 
 #if 0
@@ -96,18 +102,18 @@ bool kb_next_output(unsigned char c)
 	//         ^            reply from keyboard (ack bit)
 	//
 	cli();
-	if (kb_input_bits) {
+	if (kb->kb_input_bits) {
 		sei();
 		return false;
 	}
-	kb_output_bits = d;
-	kb->set_clock_0();	// I/O inhibit, trigger interrupt
-	kb->set_data_0();	// start bit
+	kb->kb_output_bits = d;
+	kb->io->set_clock_0();	// I/O inhibit, trigger interrupt
+	kb->io->set_data_0();	// start bit
 	sei();
 	wait_40us();
-	kb->set_clock_1();
+	kb->io->set_clock_1();
 
-	kb_timeout = 0;
+	kb->kb_timeout = 0;
 
 	return true;
 }
@@ -260,50 +266,59 @@ ISR(TIMER0_OVF_vect, ISR_NOBLOCK) // for 5576-003 problem
 
 // pin change interrupt
 
-//SIGNAL(PCINT2_vect)
-ISR(INT5_vect)
+void intr(PS2Keyboard *kb)
 {
-	if (kb->get_clock()) {
+	if (kb->io->get_clock()) {
 		sei();
 	} else {
 		int c;
 
-		kb_timeout = 10;	// 10ms
+		kb->kb_timeout = 10;	// 10ms
 
-		if (!kb_input_bits) {
-			if (kb_output_bits) {			// transmit mode
-				if (kb_output_bits == 1) {
-					kb_output_bits = 0;		// end transmit
-					kb_timeout = 0;
+		if (!kb->kb_input_bits) {
+			if (kb->kb_output_bits) {			// transmit mode
+				if (kb->kb_output_bits == 1) {
+					kb->kb_output_bits = 0;		// end transmit
+					kb->kb_timeout = 0;
 				} else {
-					if (kb_output_bits & 1) {
-						kb->set_data_1();
+					if (kb->kb_output_bits & 1) {
+						kb->io->set_data_1();
 					} else {
-						kb->set_data_0();
+						kb->io->set_data_0();
 					}
-					kb_output_bits >>= 1;
+					kb->kb_output_bits >>= 1;
 				}
 			} else {
-				kb_input_bits = 0x800;		// start receive
+				kb->kb_input_bits = 0x800;		// start receive
 			}
 		}
-		if (kb_input_bits) {
-			kb_input_bits >>= 1;
-			if (kb->get_data()) {
-				kb_input_bits |= 0x800;
+		if (kb->kb_input_bits) {
+			kb->kb_input_bits >>= 1;
+			if (kb->io->get_data()) {
+				kb->kb_input_bits |= 0x800;
 			}
-			if (kb_input_bits & 1) {
-				if (kb_input_bits & 0x800) {				// stop bit ?
-					if (countbits(kb_input_bits & 0x7fc) & 1) {	// odd parity ?
-						c = (kb_input_bits >> 2) & 0xff;
+			if (kb->kb_input_bits & 1) {
+				if (kb->kb_input_bits & 0x800) {				// stop bit ?
+					if (countbits(kb->kb_input_bits & 0x7fc) & 1) {	// odd parity ?
+						c = (kb->kb_input_bits >> 2) & 0xff;
 						qput(&kb_input_queue, c);
 					}
 				}
-				kb_input_bits = 0;
-				kb_timeout = 0;
+				kb->kb_input_bits = 0;
+				kb->kb_timeout = 0;
 			}
 		}
 	}
+}
+
+ISR(INT0_vect)
+{
+	intr(&ps2kb0);
+}
+
+ISR(INT5_vect)
+{
+	intr(&ps2kb1);
 }
 
 //
@@ -472,21 +487,21 @@ void handler()
 				}
 			}
 		}
-		if (repeat_timeout) {
-			if (!--repeat_timeout) {
+		if (kb->repeat_timeout) {
+			if (!--kb->repeat_timeout) {
 				repeat_count = 0;
 			}
 		}
 		cli();
-		if (kb_timeout > 0) {
-			if (kb_timeout > 1) {
-				kb_timeout--;
+		if (kb->kb_timeout > 0) {
+			if (kb->kb_timeout > 1) {
+				kb->kb_timeout--;
 			} else {
-				kb_output_bits = 0;
-				kb_input_bits = 0;
-				kb->set_data_1();
-				kb->set_clock_1();
-				kb_timeout = 0;
+				kb->kb_output_bits = 0;
+				kb->kb_input_bits = 0;
+				kb->io->set_data_1();
+				kb->io->set_clock_1();
+				kb->kb_timeout = 0;
 			}
 		}
 		sei();
@@ -645,6 +660,7 @@ void handler()
 			break;
 		default:
 			switch (real_keyboard_id) {
+#if 0
 			case 0x92ab:	// is IBM5576-001 ?
 				t = ps2decode001(&key_decode_state, c);
 				break;
@@ -652,6 +668,7 @@ void handler()
 			case 0x91ab:	// is IBM5576-003 ?
 				t = ps2decode002(&key_decode_state, c);
 				break;
+#endif
 			default:
 				t = ps2decode(&key_decode_state, c);
 				break;
@@ -668,18 +685,18 @@ void handler()
 					if ((event & 0xff) == (repeat_event & 0xff)) {
 						repeat_event = 0;
 						repeat_count = 0;
-						repeat_timeout = 0;
+						kb->repeat_timeout = 0;
 					}
 				} else {
 					event = (t & 0xff) | EVENT_KEYMAKE;
 					if (event == repeat_event) {
 						if (repeat_count) {
-							repeat_timeout = 600;
+							kb->repeat_timeout = 600;
 						}
 					} else {
 						put_event(event);
 						repeat_event = event;
-						repeat_timeout = 1200;
+						kb->repeat_timeout = 1200;
 						repeat_count = typematic_delay;
 
 						switch (event & 0xff) {
@@ -797,13 +814,17 @@ void quckey_setup()
 	int c;
 	unsigned short t;
 
+	ps2kb0.io = &ps2kb0io;
+	ps2kb1.io = &ps2kb1io;
+	kb = &ps2kb1;
+
 	PORTD = 0;
 	DDRD = 0xaa;
 
 //	// enable pin change interrupt
-//	EIMSK |= 0x21;
-	EIMSK |= 0x20;
-//	EICRA = 0x01;
+	EIMSK |= 0x21;
+//	EIMSK |= 0x20;
+	EICRA = 0x01;
 	EICRB = 0x04;
 
 	// enable interval timer
@@ -812,8 +833,8 @@ void quckey_setup()
 
 	// start!
 
-	kb->set_clock_0();
-	kb->set_data_1();
+	kb->io->set_clock_0();
+	kb->io->set_data_1();
 
 	qinit(&event_queue_l);
 	qinit(&event_queue_h);
@@ -835,7 +856,7 @@ void quckey_setup()
 	break_enable = true;
 	scan_enable = true;
 
-	kb->set_clock_1();
+	kb->io->set_clock_1();
 
 	put_event(EVENT_INIT);
 

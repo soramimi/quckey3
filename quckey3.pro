@@ -14,10 +14,10 @@ SOURCES += \
     main.c \
     main.cpp \
     board.cpp \
-    ps2dec.cpp \
     ps2dec001.cpp \
     ps2dec002.cpp \
     ps2if.cpp \
     quckey.cpp \
     queue16.cpp \
-    waitloop.cpp
+    waitloop.cpp \
+    ps2dec.c

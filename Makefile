@@ -92,7 +92,7 @@ B_LOADER = \"jmp\ 0x7000\"
 #  -Wl,...:     tell GCC to pass this to linker.
 #    -Map:      create map file
 #    --cref:    add cross reference to  map file
-LDFLAGS = -Wl,-Map=avr_keyboard.map,--cref
+LDFLAGS = -Os -Wl,-Map=avr_keyboard.map,--cref
 LDFLAGS += -Wl,--relax
 LDFLAGS += -Wl,--gc-sections
 LDFLAGS += -lm
@@ -114,7 +114,7 @@ OBJ = \
 	waitloop.o
 
 CFLAGS = -Os -mmcu=$(MCU) -DF_CPU=$(F_CPU) -Wall -Wextra -Werror=return-type
-CC = avr-gcc $(CFLAGS) -std=gnu99
+CC = avr-gcc $(CFLAGS)
 CXX = avr-g++ $(CFLAGS) -std=c++11
 
 # Change the build target to build a HEX file or a library.
