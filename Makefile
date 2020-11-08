@@ -113,7 +113,7 @@ OBJ = \
 	main.o \
 	waitloop.o
 
-CFLAGS = -Os -mmcu=$(MCU) -DF_CPU=$(F_CPU)
+CFLAGS = -Os -mmcu=$(MCU) -DF_CPU=$(F_CPU) -Wall -Wextra -Werror=return-type
 CC = avr-gcc $(CFLAGS) -std=gnu99
 CXX = avr-g++ $(CFLAGS) -std=c++11
 

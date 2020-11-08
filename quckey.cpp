@@ -28,6 +28,9 @@ Queue kb_output_queue;
 //Queue pc_input_queue;
 //Queue pc_output_queue;
 
+PS2KB1 ps2kb1;
+AbstractPS2IO *kb = &ps2kb1;
+
 unsigned short kb_input_bits;
 unsigned short kb_output_bits;
 unsigned short pc_input_bits;
@@ -98,11 +101,11 @@ bool kb_next_output(unsigned char c)
 		return false;
 	}
 	kb_output_bits = d;
-	kb_set_clock_0();	// I/O inhibit, trigger interrupt
-	kb_set_data_0();	// start bit
+	kb->set_clock_0();	// I/O inhibit, trigger interrupt
+	kb->set_data_0();	// start bit
 	sei();
 	wait_40us();
-	kb_set_clock_1();
+	kb->set_clock_1();
 
 	kb_timeout = 0;
 
@@ -260,7 +263,7 @@ ISR(TIMER0_OVF_vect, ISR_NOBLOCK) // for 5576-003 problem
 //SIGNAL(PCINT2_vect)
 ISR(INT5_vect)
 {
-	if (kb_get_clock()) {
+	if (kb->get_clock()) {
 		sei();
 	} else {
 		int c;
@@ -274,9 +277,9 @@ ISR(INT5_vect)
 					kb_timeout = 0;
 				} else {
 					if (kb_output_bits & 1) {
-						kb_set_data_1();
+						kb->set_data_1();
 					} else {
-						kb_set_data_0();
+						kb->set_data_0();
 					}
 					kb_output_bits >>= 1;
 				}
@@ -286,7 +289,7 @@ ISR(INT5_vect)
 		}
 		if (kb_input_bits) {
 			kb_input_bits >>= 1;
-			if (kb_get_data()) {
+			if (kb->get_data()) {
 				kb_input_bits |= 0x800;
 			}
 			if (kb_input_bits & 1) {
@@ -481,8 +484,8 @@ void handler()
 			} else {
 				kb_output_bits = 0;
 				kb_input_bits = 0;
-				kb_set_data_1();
-				kb_set_clock_1();
+				kb->set_data_1();
+				kb->set_clock_1();
 				kb_timeout = 0;
 			}
 		}
@@ -809,8 +812,8 @@ void quckey_setup()
 
 	// start!
 
-	kb_set_clock_0();
-	kb_set_data_1();
+	kb->set_clock_0();
+	kb->set_data_1();
 
 	qinit(&event_queue_l);
 	qinit(&event_queue_h);
@@ -832,7 +835,7 @@ void quckey_setup()
 	break_enable = true;
 	scan_enable = true;
 
-	kb_set_clock_1();
+	kb->set_clock_1();
 
 	put_event(EVENT_INIT);
 
