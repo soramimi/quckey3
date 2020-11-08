@@ -1,8 +1,6 @@
 
-#ifndef __PS2IF_H
-#define __PS2IF_H
-
-#include "typedef.h"
+#ifndef PS2IF_H
+#define PS2IF_H
 
 void pc_set_clock_0();
 void pc_set_clock_1();

@@ -8,17 +8,16 @@ HEADERS += \
     ps2.h \
     ps2if.h \
     queue16.h \
-    typedef.h \
     waitloop.h
 SOURCES += \
-	board.c \
     usb.c \
     main.c \
     main.cpp \
-    ps2dec.c \
-    ps2dec001.c \
-    ps2dec002.c \
-    ps2if.c \
-    quckey.c \
-    queue16.c \
-    waitloop.c
+    board.cpp \
+    ps2dec.cpp \
+    ps2dec001.cpp \
+    ps2dec002.cpp \
+    ps2if.cpp \
+    quckey.cpp \
+    queue16.cpp \
+    waitloop.cpp

@@ -1,9 +1,10 @@
 
 #include "ps2.h"
+#include <stdint.h>
 
 static int tabledecode(int c)
 {
-	static const unsigned char decodetable[] = {
+	static const uint8_t decodetable[] = {
 		//0----1----2----3----4----5----6----7----8----9----A----B----C----D----E----F
 		  0, 120,   0, 116, 114, 112, 113, 123,   0, 121, 119, 117, 115,  16,  27,   0,
 		  0,  58,  44,  30,   0,  17,   2, 130, 135,   0,  46,  32,  31,  18,   3,   0,

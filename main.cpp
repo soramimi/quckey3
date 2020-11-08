@@ -169,10 +169,10 @@ void key_release(uint8_t key)
 	send();
 }
 
-extern "C" void quckey_setup();
-extern "C" void quckey_loop();
+void quckey_setup();
+void quckey_loop();
 
-extern "C" void led(int f)
+void led(int f)
 {
 	if (f) {
 		PORTB |= 0x01;
@@ -291,7 +291,7 @@ int main()
 	}
 }
 
-extern "C" void usb_put_a()
+void usb_put_a()
 {
 	memset(keyboard_data, 0, sizeof(keyboard_data));
 	keyboard_data[0] = 4;
@@ -300,7 +300,7 @@ extern "C" void usb_put_a()
 	usb_keyboard_send();
 }
 
-extern "C" void usb_puthex(int c)
+void usb_puthex(int c)
 {
 	static const char hex[] = "\x27\x1e\x1f\x20\x21\x22\x23\x24\x25\x26\x04\x05\x06\x07\x08\x09";
 	memset(keyboard_data, 0, sizeof(keyboard_data));

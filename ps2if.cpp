@@ -1,6 +1,5 @@
 
 #include <avr/io.h>
-#include "typedef.h"
 
 void pc_set_clock_0()
 {

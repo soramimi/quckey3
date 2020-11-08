@@ -5,7 +5,6 @@
 #include "queue16.h"
 #include "ps2.h"
 #include "ps2if.h"
-#include "typedef.h"
 #include "waitloop.h"
 
 typedef struct Queue16 Queue;
