@@ -1,10 +1,11 @@
 
-#include "ps2.h"
+#include <avr/pgmspace.h>
 #include <stdint.h>
+#include "ps2.h"
 
-static int tabledecode(int c)
+static uint8_t lookup_default(uint8_t c)
 {
-	static const __attribute__((__progmem__)) uint8_t decodetable[] = {
+	PROGMEM static const uint8_t decodetable[] = {
 		//0----1----2----3----4----5----6----7----8----9----A----B----C----D----E----F
 		  0, 120,   0, 116, 114, 112, 113, 123,   0, 121, 119, 117, 115,  16,  27,   0,
 		  0,  62,  44,  60,  58,  17,   2,   0,   0,   0,  46,  32,  31,  18,   3,   0,
@@ -16,10 +17,10 @@ static int tabledecode(int c)
 		 99, 104,  98,  97, 102,  96, 110,  90, 122, 106, 103, 105,  90, 101, 125,   0,
 		  0,   0,   0, 118, 124
 	};
-	return c >= 0 && c < 0x85 ? decodetable[c] : 0;
+	return c < 0x85 ? pgm_read_byte(decodetable + c) : 0;
 }
 
-unsigned short ps2decode002(unsigned char *state, unsigned char c)
+uint16_t ps2decode002(uint8_t *state, uint8_t c)
 {
 	enum {
 		_PREFIX_E0 = 0x01,
@@ -28,7 +29,7 @@ unsigned short ps2decode002(unsigned char *state, unsigned char c)
 		_KEYBREAK = 0x80,
 	};
 
-	unsigned short code;
+	uint16_t code;
 
 	code = 0;
 	if (c == 0xf0) {
@@ -40,7 +41,7 @@ unsigned short ps2decode002(unsigned char *state, unsigned char c)
 	} else if (c < 0xe0) {
 		switch (*state & 0x03) {
 		case 0:
-			code = tabledecode(c);
+			code = lookup_default(c);
 			break;
 		case _PREFIX_E0:
 			switch (c) {
@@ -71,7 +72,7 @@ unsigned short ps2decode002(unsigned char *state, unsigned char c)
 		}
 
 		{
-			unsigned char newstate = 0;
+			uint8_t newstate = 0;
 			if (code > 0) {
 				if (code == 90 && (*state & _IGNORE_90)) {
 					code = 0;

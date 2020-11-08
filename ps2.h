@@ -2,6 +2,8 @@
 #ifndef PS2_H
 #define PS2_H
 
+#include <stdint.h>
+
 enum {
 	KEYFLAG_SHIFT_L = 0x01,
 	KEYFLAG_SHIFT_R = 0x02,
@@ -20,15 +22,16 @@ enum {
 extern "C" {
 #endif
 
-unsigned short ps2decode(unsigned char *state, unsigned char c);
+uint16_t ps2decode(uint8_t *state, uint8_t c);
+uint8_t convert_scan_code_ibm_to_hid(uint8_t c);
 
 #ifdef __cplusplus
 }
 #endif
 
-int ps2encode(unsigned char number, unsigned char keyflag, void (*output)(unsigned char c, void *cookie), void *cookie);
+int ps2encode(uint8_t number, uint8_t keyflag, void (*output)(uint8_t c, void *cookie), void *cookie);
 
-unsigned short ps2decode001(unsigned char *state, unsigned char c);
-unsigned short ps2decode002(unsigned char *state, unsigned char c);
+uint16_t ps2decode001(uint8_t *state, uint8_t c);
+uint16_t ps2decode002(uint8_t *state, uint8_t c);
 
 #endif // PS2_H

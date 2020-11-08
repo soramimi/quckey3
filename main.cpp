@@ -291,6 +291,15 @@ int main()
 	}
 }
 
+void usb_put_key(uint8_t c)
+{
+	memset(keyboard_data, 0, sizeof(keyboard_data));
+	keyboard_data[0] = c;
+	usb_keyboard_send();
+	keyboard_data[0] = 0;
+	usb_keyboard_send();
+}
+
 void usb_put_a()
 {
 	memset(keyboard_data, 0, sizeof(keyboard_data));

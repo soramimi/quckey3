@@ -18,6 +18,7 @@ typedef struct Queue16 Queue;
 #define NULL 0
 
 extern void led(int f);
+extern void usb_put_key(uint8_t c);
 extern void usb_put_a();
 extern void usb_puthex(int c);
 
@@ -33,10 +34,10 @@ PS2KB1 ps2kb1io;
 class PS2Keyboard {
 public:
 	AbstractPS2IO *io;
-	unsigned short kb_input_bits;
-	unsigned short kb_output_bits;
-	unsigned char kb_timeout;
-	unsigned short repeat_timeout;
+	uint16_t kb_input_bits;
+	uint16_t kb_output_bits;
+	uint8_t kb_timeout;
+	uint16_t repeat_timeout;
 };
 
 PS2Keyboard ps2kb0;
@@ -47,7 +48,7 @@ PS2Keyboard *kb;
 
 
 
-int countbits(unsigned short c)
+int countbits(uint16_t c)
 {
 	int i;
 	for (i = 0; c; c >>= 1) {
@@ -87,9 +88,9 @@ inline void initialize_pc_input()
 
 
 
-bool kb_next_output(unsigned char c)
+bool kb_next_output(uint8_t c)
 {
-	unsigned short d = c;
+	uint16_t d = c;
 	if (!(countbits(d) & 1)) d |= 0x100;	// make odd parity
 	d = (d | 0x600) << 1;
 	//
@@ -119,10 +120,10 @@ bool kb_next_output(unsigned char c)
 }
 
 #if 0
-bool pc_send(unsigned char c)
+bool pc_send(uint8_t c)
 {
-	unsigned char i;
-	unsigned short bits;
+	uint8_t i;
+	uint16_t bits;
 
 	bits = c & 0xff;
 	if (!(countbits(bits) & 1)) bits |= 0x100;
@@ -148,7 +149,7 @@ bool pc_send(unsigned char c)
 int pc_recv()
 {
 	int i;
-	unsigned short bits;
+	uint16_t bits;
 
 	if (!pc_get_clock()) return -1;
 	if (pc_get_data()) return -1;
@@ -188,7 +189,7 @@ int pc_recv()
 
 
 
-inline void kb_put(unsigned char c)
+inline void kb_put(uint8_t c)
 {
 	qput(&kb_output_queue, c & 0xff);
 }
@@ -203,7 +204,7 @@ inline int kb_get()
 }
 
 #if 0
-inline void pc_put(unsigned char c)
+inline void pc_put(uint8_t c)
 {
 	qput(&pc_output_queue, c & 0xff);
 }
@@ -215,9 +216,9 @@ inline int pc_get()
 }
 #endif
 
-inline unsigned short get_event()
+inline uint16_t get_event()
 {
-	unsigned short l, h;
+	uint16_t l, h;
 	cli();
 	l = qget(&event_queue_l);
 	h = qget(&event_queue_h);
@@ -226,7 +227,7 @@ inline unsigned short get_event()
 	return (h << 8) | l;
 }
 
-inline void put_event(unsigned short c)
+inline void put_event(uint16_t c)
 {
 	cli();
 	qput(&event_queue_l, c);
@@ -234,7 +235,7 @@ inline void put_event(unsigned short c)
 	sei();
 }
 
-inline void unget_event(unsigned short c)
+inline void unget_event(uint16_t c)
 {
 	cli();
 	qunget(&event_queue_l, c);
@@ -251,7 +252,7 @@ uint8_t quckey_timerevent = 0;
 #define SCALE (CLOCK / 256)
 #define PRESCALE 8
 
-static unsigned short _scale = 0;
+static uint16_t _scale = 0;
 
 //SIGNAL(TIMER0_OVF_vect)
 ISR(TIMER0_OVF_vect, ISR_NOBLOCK) // for 5576-003 problem
@@ -386,23 +387,23 @@ enum {
 
 
 
-unsigned char key_decode_state;
-//unsigned short pc_state;
-unsigned short kb_state;
-unsigned char shiftflags;
-//unsigned short pc_init_timer;
-unsigned short kb_reset_timer;
-unsigned char indicator;
+uint8_t key_decode_state;
+//uint16_t pc_state;
+uint16_t kb_state;
+uint8_t shiftflags;
+//uint16_t pc_init_timer;
+uint16_t kb_reset_timer;
+uint8_t indicator;
 
-unsigned short typematic;
+uint16_t typematic;
 int typematic_rate;  // ms
 int typematic_delay; // ms
 
-unsigned short repeat_count;
-unsigned short repeat_event;
-unsigned short real_keyboard_id;
-unsigned short fake_keyboard_id;
-unsigned short _keyboard_id;
+uint16_t repeat_count;
+uint16_t repeat_event;
+uint16_t real_keyboard_id;
+uint16_t fake_keyboard_id;
+uint16_t _keyboard_id;
 bool break_enable;
 bool scan_enable;
 
@@ -410,7 +411,7 @@ bool scan_enable;
 
 #if 0
 
-void change_typematic(unsigned char v)
+void change_typematic(uint8_t v)
 {
 	typematic = v;
 	typematic_rate = 13;
@@ -419,7 +420,7 @@ void change_typematic(unsigned char v)
 
 #else
 
-void change_typematic(unsigned char v)
+void change_typematic(uint8_t v)
 {
 	typematic = v;
 
@@ -449,7 +450,7 @@ int get_typematic_delay()
 
 
 #if 0
-static void _send_pc(unsigned char c, void *cookie)
+static void _send_pc(uint8_t c, void *cookie)
 {
 	pc_put(c);
 }
@@ -523,6 +524,8 @@ void handler()
 			break;
 		case EVENT_KEYMAKE:
 			c = event & 0xff;
+			c = convert_scan_code_ibm_to_hid(c);
+			usb_put_key(c);
 //			ps2encode(c, shiftflags | KEYFLAG_MAKE, _send_pc, NULL);
 			switch (c) {
 			case 44:	shiftflags |= KEYFLAG_SHIFT_L;		break;
@@ -535,6 +538,7 @@ void handler()
 			break;
 		case EVENT_KEYBREAK:
 			c = event & 0xff;
+			usb_put_key(0);
 //			ps2encode(c, shiftflags, _send_pc, NULL);
 			switch (c) {
 			case 44:	shiftflags &= ~KEYFLAG_SHIFT_L;		break;
@@ -559,7 +563,7 @@ void handler()
 
 	c = kb_get();
 	if (c >= 0) {
-		unsigned short t;
+		uint16_t t;
 
 		switch (kb_state) {
 		case KB_INIT + 0:
@@ -673,10 +677,8 @@ void handler()
 				t = ps2decode(&key_decode_state, c);
 				break;
 			}
-			usb_puthex(t >> 8);
-			usb_puthex(t);
 			if (t && scan_enable) {
-				unsigned short event;
+				uint16_t event;
 				if (t & 0x8000) {
 					event = (t & 0xff) | EVENT_KEYBREAK;
 					if (break_enable) {
@@ -812,7 +814,7 @@ void handler()
 void quckey_setup()
 {
 	int c;
-	unsigned short t;
+	uint16_t t;
 
 	ps2kb0.io = &ps2kb0io;
 	ps2kb1.io = &ps2kb1io;
