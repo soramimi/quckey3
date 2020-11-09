@@ -18,19 +18,10 @@ enum {
 	KEYFLAG_MAKE = 0x80,
 };
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
-uint16_t ps2decode(uint8_t *state, uint8_t c);
 uint8_t convert_scan_code_ibm_to_hid(uint8_t c);
 
-#ifdef __cplusplus
-}
-#endif
-
-int ps2encode(uint8_t number, uint8_t keyflag, void (*output)(uint8_t c, void *cookie), void *cookie);
-
+uint16_t ps2decode(uint8_t *state, uint8_t c);
 uint16_t ps2decode001(uint8_t *state, uint8_t c);
 uint16_t ps2decode002(uint8_t *state, uint8_t c);
 
