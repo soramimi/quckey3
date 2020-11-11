@@ -32,17 +32,15 @@ struct PS2Device {
 	Queue output_queue;
 	Queue event_queue_l;
 	Queue event_queue_h;
-};
+	uint16_t reset_timer;
+	uint16_t state;
 
-class PS2Keyboard {
-public:
-	PS2Device dev;
+	uint16_t real_device_id;
+	uint16_t fake_device_id;
 
 	uint16_t repeat_timeout;
 	uint8_t decode_state;
-	uint16_t state;
 	uint8_t shiftflags;
-	uint16_t reset_timer;
 	uint8_t indicator;
 
 	uint16_t typematic;
@@ -51,22 +49,13 @@ public:
 
 	uint16_t repeat_count;
 	uint16_t repeat_event;
-	uint16_t _keyboard_id;
-	uint16_t real_keyboard_id;
-	uint16_t fake_keyboard_id;
+	uint16_t _device_id;
 	bool break_enable;
 	bool scan_enable;
 };
 
-class PS2Mouse {
-public:
-	PS2Device dev;
-};
-
-PS2Keyboard ps2k0;
-PS2Keyboard ps2k1;
-PS2Mouse ps2m0;
-PS2Mouse ps2m1;
+PS2Device ps2k0;
+PS2Device ps2k1;
 
 int countbits(uint16_t c)
 {
@@ -198,17 +187,17 @@ void intr(PS2Device *dev)
 
 ISR(INT0_vect)
 {
-	intr(&ps2k0.dev);
+	intr(&ps2k0);
 }
 
 ISR(INT5_vect)
 {
-	intr(&ps2k1.dev);
+	intr(&ps2k1);
 }
 
 //
 
-void ps2io_handler(PS2Device *dev)
+void ps2_io_handler(PS2Device *dev)
 {
 	int c;
 
@@ -239,10 +228,12 @@ enum {
 #endif
 
 enum {
-	KB_INIT			= 0x0000,
-	KB_NORMAL		= 0x0100,
-	KB_WAIT			= 0x0200,
-	KB_ED			= 0x0300,
+	PS2_INIT          = 0x0000,
+	PS2_KEYBOARD_INIT = 0x0100,
+	PS2_MOUSE_INIT    = 0x0200,
+	PS2_NORMAL        = 0x0300,
+	PS2_WAIT	          = 0x0400,
+	PS2_ED            = 0x0500,
 };
 
 enum {
@@ -269,7 +260,7 @@ void change_typematic(uint8_t v)
 
 #else
 
-void change_typematic(PS2Keyboard *kb, uint8_t v)
+void change_typematic(PS2Device *kb, uint8_t v)
 {
 	kb->typematic = v;
 
@@ -286,12 +277,12 @@ void change_typematic(PS2Keyboard *kb, uint8_t v)
 
 #endif
 
-int get_typematic_rate(PS2Keyboard *kb)
+int get_typematic_rate(PS2Device *kb)
 {
 	return kb->typematic_rate;
 }
 
-int get_typematic_delay(PS2Keyboard *kb)
+int get_typematic_delay(PS2Device *kb)
 {
 	return kb->typematic_delay;
 }
@@ -304,173 +295,218 @@ static void _send_pc(uint8_t c, void *cookie)
 }
 #endif
 
-void keyboard_handler(PS2Keyboard *kb, bool timer_event_flag)
+void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 {
 	int c;
 	long event;
 
 	if (timer_event_flag) {
-		if (kb->reset_timer) {
-			if (!--kb->reset_timer) {
-				put_event(&kb->dev, EVENT_INIT);
+		if (k->reset_timer > 0) {
+			k->reset_timer--;
+			if (k->reset_timer == 0) {
+				put_event(k, EVENT_INIT);
 			}
 		}
-		if (kb->repeat_count) {
-			if (!--kb->repeat_count) {
-				if (kb->repeat_event) {
-					put_event(&kb->dev, kb->repeat_event);
-					kb->repeat_count = kb->typematic_rate;
+		if (k->repeat_count > 0) {
+			k->repeat_count--;
+			if (k->repeat_count == 0) {
+				if (k->repeat_event != 0) {
+					put_event(k, k->repeat_event);
+					k->repeat_count = k->typematic_rate;
 				}
 			}
 		}
-		if (kb->repeat_timeout) {
-			if (!--kb->repeat_timeout) {
-				kb->repeat_count = 0;
+		if (k->repeat_timeout > 0) {
+			k->repeat_timeout--;
+			if (k->repeat_timeout == 0) {
+				k->repeat_count = 0;
 			}
 		}
 		cli();
-		if (kb->dev.timeout > 0) {
-			if (kb->dev.timeout > 1) {
-				kb->dev.timeout--;
+		if (k->timeout > 0) {
+			if (k->timeout > 1) {
+				k->timeout--;
 			} else {
-				kb->dev.output_bits = 0;
-				kb->dev.input_bits = 0;
-				kb->dev.io->set_data_1();
-				kb->dev.io->set_clock_1();
-				kb->dev.timeout = 0;
+				k->output_bits = 0;
+				k->input_bits = 0;
+				k->io->set_data_1();
+				k->io->set_clock_1();
+				k->timeout = 0;
 			}
 		}
 		sei();
 	}
 
-	event = get_event(&kb->dev);
+	event = get_event(k);
 	if (event > 0) {
 		switch (event & 0xff00) {
 		case EVENT_INIT:
-			kb_put(&kb->dev, 0xff);
-			kb->state = KB_INIT;
-			kb->reset_timer = 3000;
+			kb_put(k, 0xff);
+			k->state = PS2_INIT;
+			k->reset_timer = 3000;
 			break;
 		case EVENT_KEYMAKE:
 			c = event & 0xff;
 			c = convert_scan_code_ibm_to_hid(c);
 			press_key(c);
 			switch (c) {
-			case 44:	kb->shiftflags |= KEYFLAG_SHIFT_L;		break;
-			case 57:	kb->shiftflags |= KEYFLAG_SHIFT_R;		break;
-			case 58:	kb->shiftflags |= KEYFLAG_CTRL_L;		break;
-			case 64:	kb->shiftflags |= KEYFLAG_CTRL_R;		break;
-			case 60:	kb->shiftflags |= KEYFLAG_ALT_L;		break;
-			case 62:	kb->shiftflags |= KEYFLAG_ALT_R;		break;
+			case 44:	k->shiftflags |= KEYFLAG_SHIFT_L;		break;
+			case 57:	k->shiftflags |= KEYFLAG_SHIFT_R;		break;
+			case 58:	k->shiftflags |= KEYFLAG_CTRL_L;		break;
+			case 64:	k->shiftflags |= KEYFLAG_CTRL_R;		break;
+			case 60:	k->shiftflags |= KEYFLAG_ALT_L;		break;
+			case 62:	k->shiftflags |= KEYFLAG_ALT_R;		break;
 			}
 			break;
 		case EVENT_KEYBREAK:
 			c = event & 0xff;
 			press_key(0);
 			switch (c) {
-			case 44:	kb->shiftflags &= ~KEYFLAG_SHIFT_L;		break;
-			case 57:	kb->shiftflags &= ~KEYFLAG_SHIFT_R;		break;
-			case 58:	kb->shiftflags &= ~KEYFLAG_CTRL_L;		break;
-			case 64:	kb->shiftflags &= ~KEYFLAG_CTRL_R;		break;
-			case 60:	kb->shiftflags &= ~KEYFLAG_ALT_L;		break;
-			case 62:	kb->shiftflags &= ~KEYFLAG_ALT_R;		break;
+			case 44:	k->shiftflags &= ~KEYFLAG_SHIFT_L;		break;
+			case 57:	k->shiftflags &= ~KEYFLAG_SHIFT_R;		break;
+			case 58:	k->shiftflags &= ~KEYFLAG_CTRL_L;		break;
+			case 64:	k->shiftflags &= ~KEYFLAG_CTRL_R;		break;
+			case 60:	k->shiftflags &= ~KEYFLAG_ALT_L;		break;
+			case 62:	k->shiftflags &= ~KEYFLAG_ALT_R;		break;
 			}
 			break;
 		case EVENT_SEND_KB_INDICATOR:
-			if (kb->state != KB_NORMAL) {
-				unget_event(&kb->dev, event);
+			if (k->state != PS2_NORMAL) {
+				unget_event(k, event);
 			} else {
-				kb_put(&kb->dev, 0xed);
-				kb->state = KB_ED;
-				kb->reset_timer = 500;
+				kb_put(k, 0xed);
+				k->state = PS2_ED;
+				k->reset_timer = 500;
 			}
 			break;
 		}
 	}
 
-	c = kb_get(&kb->dev);
+	c = kb_get(k);
 	if (c >= 0) {
 		uint16_t t;
 
-		switch (kb->state) {
-		case KB_INIT + 0:
+		switch (k->state) {
+		case PS2_INIT + 0:
 			if (c == 0xfa) {
 				c = -1;
-			} if (c == 0xaa) {
-				kb_put(&kb->dev, 0xf2);
-				kb->state++;
+			} else if (c == 0xaa) {
+				kb_put(k, 0xf2);
+				k->state++;
 				c = -1;
 			}
 			break;
-		case KB_INIT + 1:
+		case PS2_INIT + 1:
 			if (c == 0xfa) {
-				kb->state++;
+				k->state++;
 				c = -1;
 			}
 			break;
-		case KB_INIT + 2:	// receive keyboard ID 1st byte
-			kb->_keyboard_id = c;
-			kb->state++;
+		case PS2_INIT + 2:	// receive keyboard ID 1st byte
+			if (c == 0x00) { // mouse
+				k->real_device_id = 0;
+				k->fake_device_id = 0;
+				kb_put(k, 0xf6);
+				k->state = PS2_MOUSE_INIT;
+			} else {
+				k->_device_id = c;
+				k->state = PS2_KEYBOARD_INIT;
+			}
 			c = -1;
 			break;
-		case KB_INIT + 3:	// receive keyboard ID 2nd byte
-			kb->_keyboard_id |= c << 8;
-			kb->real_keyboard_id = kb->_keyboard_id;
-			kb_put(&kb->dev, 0xf3);
-			kb->state++;
+		case PS2_KEYBOARD_INIT + 0:	// receive keyboard ID 2nd byte
+			k->_device_id |= c << 8;
+			k->real_device_id = k->_device_id;
+			kb_put(k, 0xf3);
+			k->state++;
 			c = -1;
 			break;
-		case KB_INIT + 4:
+		case PS2_KEYBOARD_INIT + 1:
 			if (c == 0xfa) {
-				kb_put(&kb->dev, 0x00);
-				kb->state++;
+				kb_put(k, 0x00);
+				k->state++;
 				c = -1;
 			}
 			break;
-		case KB_INIT + 5:
+		case PS2_KEYBOARD_INIT + 2:
 			if (c == 0xfa) {
-				kb_put(&kb->dev, 0xf4);
-				kb->state++;
+				kb_put(k, 0xf4);
+				k->state++;
 				c = -1;
 			}
 			break;
-		case KB_INIT + 6:
+		case PS2_KEYBOARD_INIT + 3:
 			if (c == 0xfa) {
-				kb_put(&kb->dev, 0xf0);
-				kb->state++;
+				kb_put(k, 0xf0);
+				k->state++;
 				c = -1;
 			}
 			break;
-		case KB_INIT + 7:
+		case PS2_KEYBOARD_INIT + 4:
 			if (c == 0xfa) {
-				switch (kb->real_keyboard_id) {
+				switch (k->real_device_id) {
 				case 0x92ab:	// is IBM5576-001 ?
 				case 0x90ab:	// is IBM5576-002 ?
 				case 0x91ab:	// is IBM5576-003 ?
-					kb_put(&kb->dev, 0x82);
+					kb_put(k, 0x82);
 					break;
 				default:
-					kb_put(&kb->dev, 0x02);
+					kb_put(k, 0x02);
 					break;
 				}
 				c = -1;
 			}
-			kb->state = KB_WAIT;
+			k->state = PS2_WAIT;
 			break;
-		case KB_ED:
+		case PS2_MOUSE_INIT + 0:
 			if (c == 0xfa) {
-				kb_put(&kb->dev, kb->indicator);
-				kb->state = KB_WAIT;
+				kb_put(k, 0xf3); // set sample rate
+				k->state++;
 				c = -1;
-			} else {
-				kb->state = KB_NORMAL;
 			}
 			break;
-		case KB_WAIT:
+		case PS2_MOUSE_INIT + 1:
+			if (c == 0xfa) {
+				kb_put(k, 100); // 100samples/sec
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 2:
+			if (c == 0xfa) {
+				kb_put(k, 0xe8); // set resolution
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 3:
+			if (c == 0xfa) {
+				kb_put(k, 3); // 8count/mm
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 4:
+			if (c == 0xfa) {
+				kb_put(k, 0xf4); // enable data reporting
+				k->state = PS2_WAIT;
+				c = -1;
+			}
+			break;
+		case PS2_ED:
+			if (c == 0xfa) {
+				kb_put(k, k->indicator);
+				k->state = PS2_WAIT;
+				c = -1;
+			} else {
+				k->state = PS2_NORMAL;
+			}
+			break;
+		case PS2_WAIT:
 			led(1);
-			kb->reset_timer = 0;
-			kb->scan_enable = true;
-			kb->state = KB_NORMAL;
+			k->reset_timer = 0;
+			k->scan_enable = true;
+			k->state = PS2_NORMAL;
 			c = -1;
 			break;
 		}
@@ -479,57 +515,57 @@ void keyboard_handler(PS2Keyboard *kb, bool timer_event_flag)
 		case -1:
 			break;
 		case 0xaa:
-			kb_put(&kb->dev, 0xf2);
-			kb->state = KB_INIT + 1;
+			kb_put(k, 0xf2);
+			k->state = PS2_INIT + 1;
 			break;
 		case 0xfa:
 		case 0xee:
 		case 0xfc:
 		case 0xfe:
 		case 0xff:
-			kb->decode_state = 0;
-			kb->state = KB_NORMAL;
+			k->decode_state = 0;
+			k->state = PS2_NORMAL;
 			break;
 		default:
-			switch (kb->real_keyboard_id) {
+			switch (k->real_device_id) {
 			case 0x92ab:	// is IBM5576-001 ?
-				t = ps2decode001(&kb->decode_state, c);
+				t = ps2decode001(&k->decode_state, c);
 				break;
 			case 0x90ab:	// is IBM5576-002 ?
 			case 0x91ab:	// is IBM5576-003 ?
-				t = ps2decode002(&kb->decode_state, c);
+				t = ps2decode002(&k->decode_state, c);
 				break;
 			default:
-				t = ps2decode(&kb->decode_state, c);
+				t = ps2decode(&k->decode_state, c);
 				break;
 			}
-			if (t && kb->scan_enable) {
+			if (t && k->scan_enable) {
 				uint16_t event;
 				if (t & 0x8000) {
 					event = (t & 0xff) | EVENT_KEYBREAK;
-					if (kb->break_enable) {
-						put_event(&kb->dev, event);
+					if (k->break_enable) {
+						put_event(k, event);
 					}
-					if ((event & 0xff) == (kb->repeat_event & 0xff)) {
-						kb->repeat_event = 0;
-						kb->repeat_count = 0;
-						kb->repeat_timeout = 0;
+					if ((event & 0xff) == (k->repeat_event & 0xff)) {
+						k->repeat_event = 0;
+						k->repeat_count = 0;
+						k->repeat_timeout = 0;
 					}
 				} else {
 					event = (t & 0xff) | EVENT_KEYMAKE;
-					if (event == kb->repeat_event) {
-						if (kb->repeat_count) {
-							kb->repeat_timeout = 600;
+					if (event == k->repeat_event) {
+						if (k->repeat_count) {
+							k->repeat_timeout = 600;
 						}
 					} else {
-						put_event(&kb->dev, event);
-						kb->repeat_event = event;
-						kb->repeat_timeout = 1200;
-						kb->repeat_count = kb->typematic_delay;
+						put_event(k, event);
+						k->repeat_event = event;
+						k->repeat_timeout = 1200;
+						k->repeat_count = k->typematic_delay;
 
 						switch (event & 0xff) {
 						case 126:
-							kb->repeat_count = 0;	// inhibit repeat
+							k->repeat_count = 0;	// inhibit repeat
 							break;
 						}
 					}
@@ -540,38 +576,48 @@ void keyboard_handler(PS2Keyboard *kb, bool timer_event_flag)
 	}
 }
 
-void init_keyboard(PS2Keyboard *kb)
+
+
+
+
+void init_device(PS2Device *dev)
 {
-	kb->dev.io->set_clock_0();
-	kb->dev.io->set_data_1();
+	qinit(&dev->event_queue_l);
+	qinit(&dev->event_queue_h);
+	qinit(&dev->output_queue);
+	qinit(&dev->input_queue);
+	dev->output_bits = 0;
+	dev->input_bits = 0;
 
-	qinit(&kb->dev.event_queue_l);
-	qinit(&kb->dev.event_queue_h);
-	qinit(&kb->dev.output_queue);
-	qinit(&kb->dev.input_queue);
-	kb->dev.output_bits = 0;
-	kb->dev.input_bits = 0;
+	dev->reset_timer = 0;
+	dev->state = PS2_INIT;
+}
 
-	kb->reset_timer = 0;
-	kb->state = KB_INIT;
-	kb->decode_state = 0;
-	kb->shiftflags = 0;
-	kb->indicator = 0;
-	change_typematic(kb, 0x23);
-	kb->real_keyboard_id = 0x83ab;
-	kb->fake_keyboard_id = 0x83ab;
-	kb->break_enable = true;
-	kb->scan_enable = false;
+void init_keyboard(PS2Device *k)
+{
+	k->io->set_clock_0();
+	k->io->set_data_1();
 
-	kb->dev.io->set_clock_1();
+	init_device(k);
 
-	put_event(&kb->dev, EVENT_INIT);
+	k->decode_state = 0;
+	k->shiftflags = 0;
+	k->indicator = 0;
+	change_typematic(k, 0x23);
+	k->real_device_id = 0x83ab;
+	k->fake_device_id = 0x83ab;
+	k->break_enable = true;
+	k->scan_enable = false;
+
+	k->io->set_clock_1();
+
+	put_event(k, EVENT_INIT);
 }
 
 void quckey_setup()
 {
-	ps2k0.dev.io = &ps2kb0io;
-	ps2k1.dev.io = &ps2kb1io;
+	ps2k0.io = &ps2kb0io;
+	ps2k1.io = &ps2kb1io;
 
 	PORTD = 0;
 	DDRD = 0xaa;
@@ -590,10 +636,12 @@ void quckey_loop()
 	bool timerevent = quckey_timerevent;
 	quckey_timerevent = false;
 	sei();
-	keyboard_handler(&ps2k0, timerevent);
-	keyboard_handler(&ps2k1, timerevent);
-	ps2io_handler(&ps2k0.dev);
-	ps2io_handler(&ps2k1.dev);
+
+	ps2_device_handler(&ps2k0, timerevent);
+	ps2_device_handler(&ps2k1, timerevent);
+
+	ps2_io_handler(&ps2k0);
+	ps2_io_handler(&ps2k1);
 }
 
 
