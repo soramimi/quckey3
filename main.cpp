@@ -85,8 +85,6 @@ void led(int f)
 
 void init()
 {
-	uint8_t key;
-
 	PORTB = 0x00;
 	PORTC = 0x00;
 	DDRB = 0x01;
