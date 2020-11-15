@@ -58,10 +58,10 @@ ISR(TIMER0_OVF_vect, ISR_NOBLOCK)
 		_tick_count++;
 		_time_ms++;
 		if (_time_ms >= 1000) {
-			quckey_timerevent = 1;
 			_time_ms = 0;
 			_time_s++;
 		}
+		quckey_timerevent = 1;
 	}
 }
 
@@ -103,6 +103,27 @@ void init()
 	sei();  // Enable interrupts
 }
 
+struct {
+	int dx = 0;
+	int dy = 0;
+	int dz = 0;
+	int buttons = 0;
+} mouse;
+
+void change_mouse(int dx, int dy, int dz, int buttons)
+{
+	mouse.dx += dx;
+	mouse.dy += dy;
+	mouse.dz += dz;
+	mouse.buttons = buttons;
+}
+
+static inline int clamp(int v, int min, int max)
+{
+	if (v > max) v = max;
+	if (v < min) v = min;
+	return v;
+}
 
 int main()
 {
@@ -113,24 +134,23 @@ int main()
 
 	while (1) {
 		if (1) {
-#if 0
-			_delay_ms(100);
-
+			static int last_buttons = 0;
 			memset(keyboard_data, 0, sizeof(keyboard_data));
-			keyboard_data[0] = 0x04;
-			usb_keyboard_send();
-			keyboard_data[0] = 0;
-			usb_keyboard_send();
-
-
-
-			mouse_data[0] = 0;
-			mouse_data[1] = 1;
-			mouse_data[2] = 1;
-			mouse_data[3] = 0;
-
-			usb_mouse_send();
-#endif
+			int buttons = mouse.buttons;
+			int dx = clamp(mouse.dx, -127, 127);
+			int dy = clamp(mouse.dy, -127, 127);
+			int dz = clamp(mouse.dz, -127, 127);
+			if (buttons != last_buttons || dx != 0 || dy != 0 || dz != 0) {
+				last_buttons = buttons;
+				mouse.dx -= dx;
+				mouse.dy -= dy;
+				mouse.dz -= dz;
+				mouse_data[0] = buttons;
+				mouse_data[1] = dx;
+				mouse_data[2] = dy;
+				mouse_data[3] = dz;
+				usb_mouse_send();
+			}
 		}
 		quckey_loop();
 	}

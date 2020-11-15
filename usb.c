@@ -185,22 +185,22 @@ static const uint8_t PROGMEM debug_hid_report_desc[] = {
 	0xC0					// end collection
 };
 #else
-const PROGMEM uint8_t mouse_hid_report_desc[52] = {   /* USB report descriptor */
+const PROGMEM uint8_t mouse_hid_report_desc[] = {   /* USB report descriptor */
 	0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
 	0x09, 0x02,                    // USAGE (Mouse)
 	0xa1, 0x01,                    // COLLECTION (Application)
 	0x09, 0x01,                    //   USAGE (Pointer)
-	0xA1, 0x00,                    //   COLLECTION (Physical)
+	0xa1, 0x00,                    //   COLLECTION (Physical)
 	0x05, 0x09,                    //     USAGE_PAGE (Button)
-	0x19, 0x01,                    //     USAGE_MINIMUM
-	0x29, 0x03,                    //     USAGE_MAXIMUM
+	0x19, 0x01,                    //     USAGE_MINIMUM (1)
+	0x29, 0x05,                    //     USAGE_MAXIMUM (5)
 	0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
 	0x25, 0x01,                    //     LOGICAL_MAXIMUM (1)
-	0x95, 0x03,                    //     REPORT_COUNT (3)
 	0x75, 0x01,                    //     REPORT_SIZE (1)
+	0x95, 0x05,                    //     REPORT_COUNT (5)
 	0x81, 0x02,                    //     INPUT (Data,Var,Abs)
+	0x75, 0x03,                    //     REPORT_SIZE (3)
 	0x95, 0x01,                    //     REPORT_COUNT (1)
-	0x75, 0x05,                    //     REPORT_SIZE (5)
 	0x81, 0x03,                    //     INPUT (Const,Var,Abs)
 	0x05, 0x01,                    //     USAGE_PAGE (Generic Desktop)
 	0x09, 0x30,                    //     USAGE (X)

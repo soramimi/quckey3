@@ -6,6 +6,7 @@
 #include "ps2.h"
 #include "ps2if.h"
 #include "waitloop.h"
+#include <stdlib.h>
 
 typedef struct Queue16 Queue;
 #define qinit(Q) q16init(Q)
@@ -16,9 +17,16 @@ typedef struct Queue16 Queue;
 
 extern void led(int f);
 extern void press_key(uint8_t c);
+void change_mouse(int dx, int dy, int dz, int buttons);
 extern void usb_puthex(int c);
 
 uint8_t quckey_timerevent = 0; // 1ms interval event
+
+enum MouseDeviceType {
+	NoMouse,
+	NormalMouse,
+	TrackManMarbleFX,
+};
 
 PS2KB0 ps2kb0io;
 PS2KB1 ps2kb1io;
@@ -37,6 +45,15 @@ struct PS2Device {
 
 	uint16_t real_device_id;
 	uint16_t fake_device_id;
+	MouseDeviceType mouse_device_type = NoMouse;
+
+	uint16_t receive_timeout;
+	uint8_t mouse_received;
+	int wheel_movement = 0;
+	int side_button_movement = 0;
+	uint8_t mouse_buffer[4];
+	uint8_t mouse_buttons = 0;
+	uint8_t mouse_buttons2 = 0;
 
 	uint16_t repeat_timeout;
 	uint8_t decode_state;
@@ -322,6 +339,12 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 				k->repeat_count = 0;
 			}
 		}
+		if (k->receive_timeout > 0) {
+			k->receive_timeout--;
+			if (k->receive_timeout == 0) {
+				k->mouse_received = 0;
+			}
+		}
 		cli();
 		if (k->timeout > 0) {
 			if (k->timeout > 1) {
@@ -386,6 +409,8 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 	if (c >= 0) {
 		uint16_t t;
 
+		k->receive_timeout = 0;
+
 		switch (k->state) {
 		case PS2_INIT + 0:
 			if (c == 0xfa) {
@@ -406,6 +431,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			if (c == 0x00) { // mouse
 				k->real_device_id = 0;
 				k->fake_device_id = 0;
+				k->mouse_device_type = NormalMouse;
 				kb_put(k, 0xf6);
 				k->state = PS2_MOUSE_INIT;
 			} else {
@@ -855,8 +881,8 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			}
 			break;
 		case PS2_MOUSE_INIT + 50:
-			led(1);
 			if (c == 0xfa) {
+				k->mouse_device_type = TrackManMarbleFX;
 				kb_put(k, 0xf4); // enable data reporting
 				k->state = PS2_WAIT;
 				c = -1;
@@ -880,67 +906,173 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			break;
 		}
 
-		switch (c) {
-		case -1:
-			break;
-		case 0xaa:
-			kb_put(k, 0xf2);
-			k->state = PS2_INIT + 1;
-			break;
-		case 0xfa:
-		case 0xee:
-		case 0xfc:
-		case 0xfe:
-		case 0xff:
-			k->decode_state = 0;
-			k->state = PS2_NORMAL;
-			break;
-		default:
-			switch (k->real_device_id) {
-			case 0x92ab:	// is IBM5576-001 ?
-				t = ps2decode001(&k->decode_state, c);
-				break;
-			case 0x90ab:	// is IBM5576-002 ?
-			case 0x91ab:	// is IBM5576-003 ?
-				t = ps2decode002(&k->decode_state, c);
-				break;
-			default:
-				t = ps2decode(&k->decode_state, c);
-				break;
-			}
-			if (t && k->scan_enable) {
-				uint16_t event;
-				if (t & 0x8000) {
-					event = (t & 0xff) | EVENT_KEYBREAK;
-					if (k->break_enable) {
-						put_event(k, event);
-					}
-					if ((event & 0xff) == (k->repeat_event & 0xff)) {
-						k->repeat_event = 0;
-						k->repeat_count = 0;
-						k->repeat_timeout = 0;
-					}
-				} else {
-					event = (t & 0xff) | EVENT_KEYMAKE;
-					if (event == k->repeat_event) {
-						if (k->repeat_count) {
-							k->repeat_timeout = 600;
-						}
-					} else {
-						put_event(k, event);
-						k->repeat_event = event;
-						k->repeat_timeout = 1200;
-						k->repeat_count = k->typematic_delay;
+		if (c >= 0) {
+			if (k->real_device_id == 0) { // mouse
+				if (k->mouse_received < 3) {
+					k->mouse_buffer[k->mouse_received++] = c;
+					if (k->mouse_received >= 3) {
+						int dz = 0;
+						uint8_t flags = k->mouse_buffer[0];
+						if (flags & 0xc0) {
+							if ((flags & 0xc8) == 0xc8) {
+								if (k->mouse_buffer[1] == 0xd2) {
+									if (k->mouse_device_type == TrackManMarbleFX) {
+										k->mouse_buttons = (k->mouse_buttons & 0x07) | ((k->mouse_buffer[2] >> 1) & 0x08);
+									}
+								}
+							}
+						} else {
+							k->mouse_buttons = (k->mouse_buttons & 0xf8) | (flags & 0x07);
+							int dx = k->mouse_buffer[1];
+							int dy = k->mouse_buffer[2];
+							if (flags & 0x10) dx |= -1 << 8;
+							if (flags & 0x20) dy |= -1 << 8;
+							int buttons = k->mouse_buttons & 0x07;
 
-						switch (event & 0xff) {
-						case 126:
-							k->repeat_count = 0;	// inhibit repeat
-							break;
+							if (k->mouse_buttons & 0x08) {
+								if (abs(dx) > abs(dy)) {
+									k->wheel_movement = 0;
+									if (dx < 0) {
+										buttons &= ~0x10;
+										if (k->side_button_movement > 0) {
+											k->side_button_movement = dx;
+											buttons &= ~0x08;
+										} else {
+											k->side_button_movement += dx;
+											if (k->side_button_movement < -100) {
+												k->side_button_movement = -100;
+												buttons |= 0x08;
+											}
+										}
+									} else if (dx > 0) {
+										buttons &= ~0x08;
+										if (k->side_button_movement < 0) {
+											k->side_button_movement = dx;
+											buttons &= ~0x10;
+										} else {
+											k->side_button_movement += dx;
+											if (k->side_button_movement > 100) {
+												k->side_button_movement = 100;
+												buttons |= 0x10;
+											}
+										}
+									} else {
+										buttons &= ~0x18;
+										k->side_button_movement = 0;
+									}
+								} else {
+									buttons &= ~0x18;
+									k->side_button_movement = 0;
+									k->wheel_movement -= dy;
+									while (k->wheel_movement >= 10) {
+										k->wheel_movement -= 10;
+										dz--;
+									}
+									while (k->wheel_movement <= -10) {
+										k->wheel_movement += 10;
+										dz++;
+									}
+								}
+								dx = 0;
+								dy = 0;
+							} else {
+								buttons &= ~0x18;
+								k->side_button_movement = 0;
+								k->wheel_movement = 0;
+								if (1) { // acceleration
+									int xx = dx * dx;
+									int yy = dy * dy;
+									if (xx + yy >= 9) {
+										if (xx + yy < 300) {
+											if (xx > yy) {
+												if (dx < 0) {
+													dx++;
+												} else {
+													dx--;
+												}
+											}
+											if (xx < yy) {
+												if (dy < 0) {
+													dy++;
+												} else {
+													dy--;
+												}
+											}
+										}
+										dx *= 2;
+										dy *= 2;
+									}
+								}
+							}
+
+							change_mouse(dx, -dy, dz, buttons);
 						}
+						k->mouse_received = 0;
 					}
 				}
+				k->receive_timeout = 10;
+			} else { // keyboard
+				switch (c) {
+				case 0xaa:
+					kb_put(k, 0xf2);
+					k->state = PS2_INIT + 1;
+					break;
+				case 0xfa:
+				case 0xee:
+				case 0xfc:
+				case 0xfe:
+				case 0xff:
+					k->decode_state = 0;
+					k->state = PS2_NORMAL;
+					break;
+				default:
+					switch (k->real_device_id) {
+					case 0x92ab:	// is IBM5576-001 ?
+						t = ps2decode001(&k->decode_state, c);
+						break;
+					case 0x90ab:	// is IBM5576-002 ?
+					case 0x91ab:	// is IBM5576-003 ?
+						t = ps2decode002(&k->decode_state, c);
+						break;
+					default:
+						t = ps2decode(&k->decode_state, c);
+						break;
+					}
+					if (t && k->scan_enable) {
+						uint16_t event;
+						if (t & 0x8000) {
+							event = (t & 0xff) | EVENT_KEYBREAK;
+							if (k->break_enable) {
+								put_event(k, event);
+							}
+							if ((event & 0xff) == (k->repeat_event & 0xff)) {
+								k->repeat_event = 0;
+								k->repeat_count = 0;
+								k->repeat_timeout = 0;
+							}
+						} else {
+							event = (t & 0xff) | EVENT_KEYMAKE;
+							if (event == k->repeat_event) {
+								if (k->repeat_count) {
+									k->repeat_timeout = 600;
+								}
+							} else {
+								put_event(k, event);
+								k->repeat_event = event;
+								k->repeat_timeout = 1200;
+								k->repeat_count = k->typematic_delay;
+
+								switch (event & 0xff) {
+								case 126:
+									k->repeat_count = 0;	// inhibit repeat
+									break;
+								}
+							}
+						}
+					}
+					break;
+				}
 			}
-			break;
 		}
 	}
 }
@@ -969,6 +1101,8 @@ void init_keyboard(PS2Device *k)
 
 	init_device(k);
 
+	k->receive_timeout = 0;
+
 	k->decode_state = 0;
 	k->shiftflags = 0;
 	k->indicator = 0;
@@ -977,6 +1111,8 @@ void init_keyboard(PS2Device *k)
 	k->fake_device_id = 0x83ab;
 	k->break_enable = true;
 	k->scan_enable = false;
+
+	k->mouse_received = 0;
 
 	k->io->set_clock_1();
 
