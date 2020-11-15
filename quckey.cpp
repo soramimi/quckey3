@@ -430,7 +430,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			break;
 		case PS2_KEYBOARD_INIT + 2:
 			if (c == 0xfa) {
-				kb_put(k, 0xf4);
+				kb_put(k, 0xf4); // enable data reporting
 				k->state++;
 				c = -1;
 			}
@@ -458,6 +458,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			}
 			k->state = PS2_WAIT;
 			break;
+#if 0
 		case PS2_MOUSE_INIT + 0:
 			if (c == 0xfa) {
 				kb_put(k, 0xf3); // set sample rate
@@ -467,32 +468,401 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			break;
 		case PS2_MOUSE_INIT + 1:
 			if (c == 0xfa) {
-				kb_put(k, 100); // 100samples/sec
+				kb_put(k, 200); // 200samples/sec
 				k->state++;
 				c = -1;
 			}
 			break;
 		case PS2_MOUSE_INIT + 2:
 			if (c == 0xfa) {
-				kb_put(k, 0xe8); // set resolution
+				kb_put(k, 0xf3); // set sample rate
 				k->state++;
 				c = -1;
 			}
 			break;
 		case PS2_MOUSE_INIT + 3:
 			if (c == 0xfa) {
-				kb_put(k, 3); // 8count/mm
+				kb_put(k, 100); // 100samples/sec
 				k->state++;
 				c = -1;
 			}
 			break;
 		case PS2_MOUSE_INIT + 4:
 			if (c == 0xfa) {
+				kb_put(k, 0xf3); // set sample rate
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 5:
+			if (c == 0xfa) {
+				kb_put(k, 80); // 80samples/sec
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 6:
+			if (c == 0xfa) {
+				kb_put(k, 0xf2); // get device id
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 7:
+			k->state++;
+			c = -1;
+			break;
+		case PS2_MOUSE_INIT + 8:
+			kb_put(k, 0xe8); // set resolution
+			k->state++;
+			c = -1;
+			break;
+		case PS2_MOUSE_INIT + 9:
+			if (c == 0xfa) {
+				kb_put(k, 3); // 8count/mm
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 10:
+			if (c == 0xfa) {
 				kb_put(k, 0xf4); // enable data reporting
 				k->state = PS2_WAIT;
 				c = -1;
 			}
 			break;
+#else
+		case PS2_MOUSE_INIT + 0:
+			if (c == 0xfa) {
+				kb_put(k, 0xf2); // get device id
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 1:
+			if (c == 0xfa) {
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 2:
+			kb_put(k, 0xf3); // set sample rate
+			k->state++;
+			c = -1;
+			break;
+		case PS2_MOUSE_INIT + 3:
+			if (c == 0xfa) {
+				kb_put(k, 10); // 10sample/sec
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 4:
+			if (c == 0xfa) {
+				kb_put(k, 0xf2); // get device id
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 5:
+			if (c == 0xfa) {
+				kb_put(k, 0xf2); // get device id
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 6:
+			kb_put(k, 0xe8); // set resolution
+			k->state++;
+			c = -1;
+			break;
+		case PS2_MOUSE_INIT + 7:
+			if (c == 0xfa) {
+				kb_put(k, 0x00); // 1count/mm
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 8:
+			if (c == 0xfa) {
+				kb_put(k, 0xe6); // set defaults
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 9:
+			if (c == 0xfa) {
+				kb_put(k, 0xe6); // set defaults
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 10:
+			if (c == 0xfa) {
+				kb_put(k, 0xe6); // set defaults
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 11:
+			if (c == 0xfa) {
+				kb_put(k, 0xe9); // status request
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 12:
+			if (c == 0xfa) {
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 13:
+			k->state++;
+			c = -1;
+			break;
+		case PS2_MOUSE_INIT + 14:
+			k->state++;
+			c = -1;
+			break;
+		case PS2_MOUSE_INIT + 15:
+			kb_put(k, 0xe8); // set resolution
+			k->state++;
+			c = -1;
+			break;
+		case PS2_MOUSE_INIT + 16:
+			if (c == 0xfa) {
+				kb_put(k, 0x00); // 1count/mm
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 17:
+			if (c == 0xfa) {
+				kb_put(k, 0xe7); // set scaling 2:1
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 18:
+			if (c == 0xfa) {
+				kb_put(k, 0xe7); // set scaling 2:1
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 19:
+			if (c == 0xfa) {
+				kb_put(k, 0xe7); // set scaling 2:1
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 20:
+			if (c == 0xfa) {
+				kb_put(k, 0xe9); // status request
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 21:
+			if (c == 0xfa) {
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 22:
+			k->state++;
+			c = -1;
+			break;
+		case PS2_MOUSE_INIT + 23:
+			k->state++;
+			c = -1;
+			break;
+		case PS2_MOUSE_INIT + 24:
+			kb_put(k, 0xe6); // set defaults
+			k->state++;
+			c = -1;
+			break;
+		case PS2_MOUSE_INIT + 25:
+			if (c == 0xfa) {
+				kb_put(k, 0xe8); // set resolution
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 26:
+			if (c == 0xfa) {
+				kb_put(k, 0x00); // 1count/mm
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 27:
+			if (c == 0xfa) {
+				kb_put(k, 0xe8); // set resolution
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 28:
+			if (c == 0xfa) {
+				kb_put(k, 0x03); // 8count/mm
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 29:
+			if (c == 0xfa) {
+				kb_put(k, 0xe8); // set resolution
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 30:
+			if (c == 0xfa) {
+				kb_put(k, 0x02); // 1count/mm
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 31:
+			if (c == 0xfa) {
+				kb_put(k, 0xe8); // set resolution
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 32:
+			if (c == 0xfa) {
+				kb_put(k, 0x01); // 2count/mm
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 33:
+			kb_put(k, 0xe6); // set defaults
+			k->state++;
+			c = -1;
+			break;
+		case PS2_MOUSE_INIT + 34:
+			if (c == 0xfa) {
+				kb_put(k, 0xe8); // set resolution
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 35:
+			if (c == 0xfa) {
+				kb_put(k, 0x03); // 8count/mm
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 36:
+			if (c == 0xfa) {
+				kb_put(k, 0xe8); // set resolution
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 37:
+			if (c == 0xfa) {
+				kb_put(k, 0x01); // 1count/mm
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 38:
+			if (c == 0xfa) {
+				kb_put(k, 0xe8); // set resolution
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 39:
+			if (c == 0xfa) {
+				kb_put(k, 0x02); // 1count/mm
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 40:
+			if (c == 0xfa) {
+				kb_put(k, 0xe8); // set resolution
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 41:
+			if (c == 0xfa) {
+				kb_put(k, 0x03); // 1count/mm
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 42:
+			if (c == 0xfa) {
+				kb_put(k, 0xe8); // set resolution
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 43:
+			if (c == 0xfa) {
+				kb_put(k, 0x03); // 1count/mm
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 44:
+			if (c == 0xfa) {
+				kb_put(k, 0xf2); // get device id
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 45:
+			if (c == 0xfa) {
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 46:
+			kb_put(k, 0xf3); // set sample rate
+			k->state++;
+			c = -1;
+			break;
+		case PS2_MOUSE_INIT + 47:
+			if (c == 0xfa) {
+				kb_put(k, 60);
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 48:
+			if (c == 0xfa) {
+				kb_put(k, 0xe8); // set rsolution
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 49:
+			if (c == 0xfa) {
+				kb_put(k, 0x03); // 8count/mm
+				k->state++;
+				c = -1;
+			}
+			break;
+		case PS2_MOUSE_INIT + 50:
+			led(1);
+			if (c == 0xfa) {
+				kb_put(k, 0xf4); // enable data reporting
+				k->state = PS2_WAIT;
+				c = -1;
+			}
+			break;
+#endif
 		case PS2_ED:
 			if (c == 0xfa) {
 				kb_put(k, k->indicator);
@@ -503,7 +873,6 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			}
 			break;
 		case PS2_WAIT:
-			led(1);
 			k->reset_timer = 0;
 			k->scan_enable = true;
 			k->state = PS2_NORMAL;
