@@ -1,6 +1,7 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <avr/pgmspace.h>
 
 #include "queue16.h"
 #include "ps2.h"
@@ -23,9 +24,97 @@ extern void usb_puthex(int c);
 uint8_t quckey_timerevent = 0; // 1ms interval event
 
 enum MouseDeviceType {
-	NoMouse,
+	Keyboard,
 	NormalMouse,
 	TrackManMarbleFX,
+};
+
+enum {
+	I_CHECK = 0x100,
+	I_SEND = 0x200,
+	I_STORE = 0x300,
+	I_EVENT0 = 0x1000,
+	I_START,
+};
+
+#define CHECK(X) (I_CHECK | (X))
+#define SEND(X) (I_SEND | (X))
+#define STORE(X) (I_STORE | (X))
+#define EVENT(X) (I_EVENT | (X))
+
+PROGMEM static const uint16_t init_sequence_for_mouse[] = {
+	CHECK(0xfa), SEND(0xf2), 0, // get device id
+	CHECK(0xfa), 0,
+	SEND(0xf3), 0,        // set sample rate
+	CHECK(0xfa), SEND(10), 0,
+	CHECK(0xfa), SEND(0xf2), 0, // get device id
+	CHECK(0xfa), 0,
+	SEND(0xe8), 0,        // set resolution
+	CHECK(0xfa), SEND(0), 0,
+	CHECK(0xfa), SEND(0xe6), 0, // set defaults
+	CHECK(0xfa), SEND(0xe6), 0, // set defaults
+	CHECK(0xfa), SEND(0xe6), 0, // set defaults
+	CHECK(0xfa), SEND(0xe9), 0, // status request
+	CHECK(0xfa), 0,
+	STORE(0), 0,
+	STORE(1), 0,
+	STORE(2), I_EVENT0,
+	0,
+};
+
+PROGMEM static const uint16_t init_sequence_for_default_mouse[] = {
+	SEND(0xe8), 0,              // set resolution
+	CHECK(0xfa), SEND(3), 0,
+	CHECK(0xfa), SEND(0xf3), 0, // set sample rate
+	CHECK(0xfa), SEND(200), 0,
+	CHECK(0xfa), SEND(0xf3), 0, // set sample rate
+	CHECK(0xfa), SEND(100), 0,
+	CHECK(0xfa), SEND(0xf3), 0, // set sample rate
+	CHECK(0xfa), SEND(80), 0,
+	CHECK(0xfa), SEND(0xf2), 0, // get device id
+	CHECK(0xfa), 0,
+	SEND(0xf3), 0,              // set sample rate
+	CHECK(0xfa), SEND(60), 0,
+	CHECK(0xfa), SEND(0xe8), 0, // set resolution
+	CHECK(0xfa), SEND(3), 0,
+	CHECK(0xfa), I_START,
+	0
+};
+
+PROGMEM static const uint16_t init_sequence_for_logitech_mouse[] = {
+	SEND(0xe6), 0,    // set defaults
+	CHECK(0xfa), SEND(0xe8), 0, // set resolution
+	CHECK(0xfa), SEND(0), 0,
+	CHECK(0xfa), SEND(0xe8), 0, // set resolution
+	CHECK(0xfa), SEND(3), 0,
+	CHECK(0xfa), SEND(0xe8), 0, // set resolution
+	CHECK(0xfa), SEND(2), 0,
+	CHECK(0xfa), SEND(0xe8), 0, // set resolution
+	CHECK(0xfa), SEND(1), 0,
+	CHECK(0xfa), SEND(0xe6), 0, // set defaults
+	CHECK(0xfa), SEND(0xe8), 0, // set resolution
+	CHECK(0xfa), SEND(3), 0,
+	CHECK(0xfa), SEND(0xe8), 0, // set resolution
+	CHECK(0xfa), SEND(1), 0,
+	CHECK(0xfa), SEND(0xe8), 0, // set resolution
+	CHECK(0xfa), SEND(2), 0,
+	CHECK(0xfa), SEND(0xe8), 0, // set resolution
+	CHECK(0xfa), SEND(3), 0,
+	CHECK(0xfa), SEND(0xe8), 0, // set resolution
+	CHECK(0xfa), SEND(3), 0,
+	CHECK(0xfa), SEND(0xf2), 0, // get device id
+	CHECK(0xfa), 0,
+	SEND(0xf3), 0,              // set sample rate
+	CHECK(0xfa), SEND(60), 0,
+	CHECK(0xfa), SEND(0xe8), 0, // set resolution
+	CHECK(0xfa), SEND(3), 0,
+	CHECK(0xfa), I_START,
+	0
+};
+
+PROGMEM static const uint16_t init_sequence_for_starting[] = {
+	SEND(0xf4), 0, // enable data reporting
+	0
 };
 
 PS2KB0 ps2kb0io;
@@ -45,7 +134,8 @@ struct PS2Device {
 
 	uint16_t real_device_id;
 	uint16_t fake_device_id;
-	MouseDeviceType mouse_device_type = NoMouse;
+	MouseDeviceType mouse_device_type = Keyboard;
+	uint16_t const *init_sequece = nullptr;
 
 	uint16_t receive_timeout;
 	uint8_t mouse_received;
@@ -373,24 +463,24 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			c = convert_scan_code_ibm_to_hid(c);
 			press_key(c);
 			switch (c) {
-			case 44:	k->shiftflags |= KEYFLAG_SHIFT_L;		break;
-			case 57:	k->shiftflags |= KEYFLAG_SHIFT_R;		break;
-			case 58:	k->shiftflags |= KEYFLAG_CTRL_L;		break;
-			case 64:	k->shiftflags |= KEYFLAG_CTRL_R;		break;
-			case 60:	k->shiftflags |= KEYFLAG_ALT_L;		break;
-			case 62:	k->shiftflags |= KEYFLAG_ALT_R;		break;
+			case 44:	k->shiftflags |= KEYFLAG_SHIFT_L;   break;
+			case 57:	k->shiftflags |= KEYFLAG_SHIFT_R;   break;
+			case 58:	k->shiftflags |= KEYFLAG_CTRL_L;    break;
+			case 64:	k->shiftflags |= KEYFLAG_CTRL_R;    break;
+			case 60:	k->shiftflags |= KEYFLAG_ALT_L;     break;
+			case 62:	k->shiftflags |= KEYFLAG_ALT_R;     break;
 			}
 			break;
 		case EVENT_KEYBREAK:
 			c = event & 0xff;
 			press_key(0);
 			switch (c) {
-			case 44:	k->shiftflags &= ~KEYFLAG_SHIFT_L;		break;
-			case 57:	k->shiftflags &= ~KEYFLAG_SHIFT_R;		break;
-			case 58:	k->shiftflags &= ~KEYFLAG_CTRL_L;		break;
-			case 64:	k->shiftflags &= ~KEYFLAG_CTRL_R;		break;
-			case 60:	k->shiftflags &= ~KEYFLAG_ALT_L;		break;
-			case 62:	k->shiftflags &= ~KEYFLAG_ALT_R;		break;
+			case 44:	k->shiftflags &= ~KEYFLAG_SHIFT_L;  break;
+			case 57:	k->shiftflags &= ~KEYFLAG_SHIFT_R;  break;
+			case 58:	k->shiftflags &= ~KEYFLAG_CTRL_L;   break;
+			case 64:	k->shiftflags &= ~KEYFLAG_CTRL_R;   break;
+			case 60:	k->shiftflags &= ~KEYFLAG_ALT_L;    break;
+			case 62:	k->shiftflags &= ~KEYFLAG_ALT_R;    break;
 			}
 			break;
 		case EVENT_SEND_KB_INDICATOR:
@@ -411,499 +501,139 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 
 		k->receive_timeout = 0;
 
-		switch (k->state) {
-		case PS2_INIT + 0:
-			if (c == 0xfa) {
-				c = -1;
-			} else if (c == 0xaa) {
-				kb_put(k, 0xf2);
-				k->state++;
-				c = -1;
+		if (k->init_sequece) {
+			while (1) {
+				int t = pgm_read_word(k->init_sequece);
+				if (t == 0) break;
+				if (t == I_START) {
+					k->init_sequece = init_sequence_for_starting;
+				} else if (t == I_EVENT0) {
+					if (k->mouse_buffer[0] == 0x19 && k->mouse_buffer[1] == 0x03 && k->mouse_buffer[2] == 0xc8) {
+						k->mouse_device_type = TrackManMarbleFX;
+						k->init_sequece = init_sequence_for_logitech_mouse;
+					} else {
+						k->init_sequece = init_sequence_for_default_mouse;
+					}
+				} else {
+					switch (t & 0xff00) {
+					case I_CHECK:
+						if (c != (t & 0xff)) {
+							k->reset_timer = 1000;
+							k->init_sequece = nullptr;
+							return;
+						}
+						break;
+					case I_SEND:
+						kb_put(k, t & 0xff);
+						break;
+					case I_STORE:
+						k->mouse_buffer[t & 0xff] = c;
+						break;
+					}
+					k->init_sequece++;
+				}
 			}
-			break;
-		case PS2_INIT + 1:
-			if (c == 0xfa) {
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_INIT + 2:	// receive keyboard ID 1st byte
-			if (c == 0x00) { // mouse
-				k->real_device_id = 0;
-				k->fake_device_id = 0;
-				k->mouse_device_type = NormalMouse;
-				kb_put(k, 0xf6);
-				k->state = PS2_MOUSE_INIT;
-			} else {
-				k->_device_id = c;
-				k->state = PS2_KEYBOARD_INIT;
+			k->init_sequece++;
+			if (pgm_read_word(k->init_sequece) == 0) {
+				k->init_sequece = nullptr;
+				k->state = PS2_WAIT;
 			}
 			c = -1;
-			break;
-		case PS2_KEYBOARD_INIT + 0:	// receive keyboard ID 2nd byte
-			k->_device_id |= c << 8;
-			k->real_device_id = k->_device_id;
-			kb_put(k, 0xf3);
-			k->state++;
-			c = -1;
-			break;
-		case PS2_KEYBOARD_INIT + 1:
-			if (c == 0xfa) {
-				kb_put(k, 0x00);
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_KEYBOARD_INIT + 2:
-			if (c == 0xfa) {
-				kb_put(k, 0xf4); // enable data reporting
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_KEYBOARD_INIT + 3:
-			if (c == 0xfa) {
-				kb_put(k, 0xf0);
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_KEYBOARD_INIT + 4:
-			if (c == 0xfa) {
-				switch (k->real_device_id) {
-				case 0x92ab:	// is IBM5576-001 ?
-				case 0x90ab:	// is IBM5576-002 ?
-				case 0x91ab:	// is IBM5576-003 ?
-					kb_put(k, 0x82);
-					break;
-				default:
-					kb_put(k, 0x02);
-					break;
+		} else {
+			switch (k->state) {
+			case PS2_INIT + 0:
+				if (c == 0xfa) {
+					c = -1;
+				} else if (c == 0xaa) {
+					kb_put(k, 0xf2);
+					k->state++;
+					c = -1;
+				}
+				break;
+			case PS2_INIT + 1:
+				if (c == 0xfa) {
+					k->state++;
+					c = -1;
+				}
+				break;
+			case PS2_INIT + 2:	// receive keyboard ID 1st byte
+				if (c == 0x00) { // mouse
+					k->real_device_id = 0;
+					k->fake_device_id = 0;
+					k->mouse_device_type = NormalMouse;
+					k->mouse_buffer[0] = 0;
+					k->mouse_buffer[1] = 0;
+					k->mouse_buffer[2] = 0;
+					kb_put(k, 0xf6);
+					k->init_sequece = init_sequence_for_mouse;
+				} else {
+					k->_device_id = c;
+					k->state = PS2_KEYBOARD_INIT;
 				}
 				c = -1;
-			}
-			k->state = PS2_WAIT;
-			break;
-#if 0
-		case PS2_MOUSE_INIT + 0:
-			if (c == 0xfa) {
-				kb_put(k, 0xf3); // set sample rate
+				break;
+			case PS2_KEYBOARD_INIT + 0:	// receive keyboard ID 2nd byte
+				k->_device_id |= c << 8;
+				k->real_device_id = k->_device_id;
+				kb_put(k, 0xf3);
 				k->state++;
 				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 1:
-			if (c == 0xfa) {
-				kb_put(k, 200); // 200samples/sec
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 2:
-			if (c == 0xfa) {
-				kb_put(k, 0xf3); // set sample rate
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 3:
-			if (c == 0xfa) {
-				kb_put(k, 100); // 100samples/sec
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 4:
-			if (c == 0xfa) {
-				kb_put(k, 0xf3); // set sample rate
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 5:
-			if (c == 0xfa) {
-				kb_put(k, 80); // 80samples/sec
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 6:
-			if (c == 0xfa) {
-				kb_put(k, 0xf2); // get device id
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 7:
-			k->state++;
-			c = -1;
-			break;
-		case PS2_MOUSE_INIT + 8:
-			kb_put(k, 0xe8); // set resolution
-			k->state++;
-			c = -1;
-			break;
-		case PS2_MOUSE_INIT + 9:
-			if (c == 0xfa) {
-				kb_put(k, 3); // 8count/mm
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 10:
-			if (c == 0xfa) {
-				kb_put(k, 0xf4); // enable data reporting
+				break;
+			case PS2_KEYBOARD_INIT + 1:
+				if (c == 0xfa) {
+					kb_put(k, 0x00);
+					k->state++;
+					c = -1;
+				}
+				break;
+			case PS2_KEYBOARD_INIT + 2:
+				if (c == 0xfa) {
+					kb_put(k, 0xf4); // enable data reporting
+					k->state++;
+					c = -1;
+				}
+				break;
+			case PS2_KEYBOARD_INIT + 3:
+				if (c == 0xfa) {
+					kb_put(k, 0xf0);
+					k->state++;
+					c = -1;
+				}
+				break;
+			case PS2_KEYBOARD_INIT + 4:
+				if (c == 0xfa) {
+					switch (k->real_device_id) {
+					case 0x92ab:	// is IBM5576-001 ?
+					case 0x90ab:	// is IBM5576-002 ?
+					case 0x91ab:	// is IBM5576-003 ?
+						kb_put(k, 0x82);
+						break;
+					default:
+						kb_put(k, 0x02);
+						break;
+					}
+					c = -1;
+				}
 				k->state = PS2_WAIT;
-				c = -1;
-			}
-			break;
-#else
-		case PS2_MOUSE_INIT + 0:
-			if (c == 0xfa) {
-				kb_put(k, 0xf2); // get device id
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 1:
-			if (c == 0xfa) {
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 2:
-			kb_put(k, 0xf3); // set sample rate
-			k->state++;
-			c = -1;
-			break;
-		case PS2_MOUSE_INIT + 3:
-			if (c == 0xfa) {
-				kb_put(k, 10); // 10sample/sec
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 4:
-			if (c == 0xfa) {
-				kb_put(k, 0xf2); // get device id
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 5:
-			if (c == 0xfa) {
-				kb_put(k, 0xf2); // get device id
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 6:
-			kb_put(k, 0xe8); // set resolution
-			k->state++;
-			c = -1;
-			break;
-		case PS2_MOUSE_INIT + 7:
-			if (c == 0xfa) {
-				kb_put(k, 0x00); // 1count/mm
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 8:
-			if (c == 0xfa) {
-				kb_put(k, 0xe6); // set defaults
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 9:
-			if (c == 0xfa) {
-				kb_put(k, 0xe6); // set defaults
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 10:
-			if (c == 0xfa) {
-				kb_put(k, 0xe6); // set defaults
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 11:
-			if (c == 0xfa) {
-				kb_put(k, 0xe9); // status request
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 12:
-			if (c == 0xfa) {
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 13:
-			k->state++;
-			c = -1;
-			break;
-		case PS2_MOUSE_INIT + 14:
-			k->state++;
-			c = -1;
-			break;
-		case PS2_MOUSE_INIT + 15:
-			kb_put(k, 0xe8); // set resolution
-			k->state++;
-			c = -1;
-			break;
-		case PS2_MOUSE_INIT + 16:
-			if (c == 0xfa) {
-				kb_put(k, 0x00); // 1count/mm
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 17:
-			if (c == 0xfa) {
-				kb_put(k, 0xe7); // set scaling 2:1
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 18:
-			if (c == 0xfa) {
-				kb_put(k, 0xe7); // set scaling 2:1
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 19:
-			if (c == 0xfa) {
-				kb_put(k, 0xe7); // set scaling 2:1
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 20:
-			if (c == 0xfa) {
-				kb_put(k, 0xe9); // status request
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 21:
-			if (c == 0xfa) {
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 22:
-			k->state++;
-			c = -1;
-			break;
-		case PS2_MOUSE_INIT + 23:
-			k->state++;
-			c = -1;
-			break;
-		case PS2_MOUSE_INIT + 24:
-			kb_put(k, 0xe6); // set defaults
-			k->state++;
-			c = -1;
-			break;
-		case PS2_MOUSE_INIT + 25:
-			if (c == 0xfa) {
-				kb_put(k, 0xe8); // set resolution
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 26:
-			if (c == 0xfa) {
-				kb_put(k, 0x00); // 1count/mm
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 27:
-			if (c == 0xfa) {
-				kb_put(k, 0xe8); // set resolution
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 28:
-			if (c == 0xfa) {
-				kb_put(k, 0x03); // 8count/mm
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 29:
-			if (c == 0xfa) {
-				kb_put(k, 0xe8); // set resolution
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 30:
-			if (c == 0xfa) {
-				kb_put(k, 0x02); // 1count/mm
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 31:
-			if (c == 0xfa) {
-				kb_put(k, 0xe8); // set resolution
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 32:
-			if (c == 0xfa) {
-				kb_put(k, 0x01); // 2count/mm
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 33:
-			kb_put(k, 0xe6); // set defaults
-			k->state++;
-			c = -1;
-			break;
-		case PS2_MOUSE_INIT + 34:
-			if (c == 0xfa) {
-				kb_put(k, 0xe8); // set resolution
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 35:
-			if (c == 0xfa) {
-				kb_put(k, 0x03); // 8count/mm
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 36:
-			if (c == 0xfa) {
-				kb_put(k, 0xe8); // set resolution
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 37:
-			if (c == 0xfa) {
-				kb_put(k, 0x01); // 1count/mm
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 38:
-			if (c == 0xfa) {
-				kb_put(k, 0xe8); // set resolution
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 39:
-			if (c == 0xfa) {
-				kb_put(k, 0x02); // 1count/mm
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 40:
-			if (c == 0xfa) {
-				kb_put(k, 0xe8); // set resolution
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 41:
-			if (c == 0xfa) {
-				kb_put(k, 0x03); // 1count/mm
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 42:
-			if (c == 0xfa) {
-				kb_put(k, 0xe8); // set resolution
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 43:
-			if (c == 0xfa) {
-				kb_put(k, 0x03); // 1count/mm
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 44:
-			if (c == 0xfa) {
-				kb_put(k, 0xf2); // get device id
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 45:
-			if (c == 0xfa) {
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 46:
-			kb_put(k, 0xf3); // set sample rate
-			k->state++;
-			c = -1;
-			break;
-		case PS2_MOUSE_INIT + 47:
-			if (c == 0xfa) {
-				kb_put(k, 60);
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 48:
-			if (c == 0xfa) {
-				kb_put(k, 0xe8); // set rsolution
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 49:
-			if (c == 0xfa) {
-				kb_put(k, 0x03); // 8count/mm
-				k->state++;
-				c = -1;
-			}
-			break;
-		case PS2_MOUSE_INIT + 50:
-			if (c == 0xfa) {
-				k->mouse_device_type = TrackManMarbleFX;
-				kb_put(k, 0xf4); // enable data reporting
-				k->state = PS2_WAIT;
-				c = -1;
-			}
-			break;
-#endif
-		case PS2_ED:
-			if (c == 0xfa) {
-				kb_put(k, k->indicator);
-				k->state = PS2_WAIT;
-				c = -1;
-			} else {
+				break;
+
+			case PS2_ED:
+				if (c == 0xfa) {
+					kb_put(k, k->indicator);
+					k->state = PS2_WAIT;
+					c = -1;
+				} else {
+					k->state = PS2_NORMAL;
+				}
+				break;
+
+			case PS2_WAIT:
+				k->reset_timer = 0;
+				k->scan_enable = true;
 				k->state = PS2_NORMAL;
+				c = -1;
+				break;
 			}
-			break;
-		case PS2_WAIT:
-			k->reset_timer = 0;
-			k->scan_enable = true;
-			k->state = PS2_NORMAL;
-			c = -1;
-			break;
 		}
 
 		if (c >= 0) {
@@ -927,80 +657,83 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 							int dy = k->mouse_buffer[2];
 							if (flags & 0x10) dx |= -1 << 8;
 							if (flags & 0x20) dy |= -1 << 8;
-							int buttons = k->mouse_buttons & 0x07;
+							int buttons = k->mouse_buttons;
 
-							if (k->mouse_buttons & 0x08) {
-								if (abs(dx) > abs(dy)) {
-									k->wheel_movement = 0;
-									if (dx < 0) {
-										buttons &= ~0x10;
-										if (k->side_button_movement > 0) {
-											k->side_button_movement = dx;
-											buttons &= ~0x08;
-										} else {
-											k->side_button_movement += dx;
-											if (k->side_button_movement < -100) {
-												k->side_button_movement = -100;
-												buttons |= 0x08;
-											}
-										}
-									} else if (dx > 0) {
-										buttons &= ~0x08;
-										if (k->side_button_movement < 0) {
-											k->side_button_movement = dx;
+							if (k->mouse_device_type == TrackManMarbleFX) {
+								buttons &= 0x07;
+								if (k->mouse_buttons & 0x08) {
+									if (abs(dx) > abs(dy)) {
+										k->wheel_movement = 0;
+										if (dx < 0) {
 											buttons &= ~0x10;
-										} else {
-											k->side_button_movement += dx;
-											if (k->side_button_movement > 100) {
-												k->side_button_movement = 100;
-												buttons |= 0x10;
+											if (k->side_button_movement > 0) {
+												k->side_button_movement = dx;
+												buttons &= ~0x08;
+											} else {
+												k->side_button_movement += dx;
+												if (k->side_button_movement < -100) {
+													k->side_button_movement = -100;
+													buttons |= 0x08;
+												}
 											}
+										} else if (dx > 0) {
+											buttons &= ~0x08;
+											if (k->side_button_movement < 0) {
+												k->side_button_movement = dx;
+												buttons &= ~0x10;
+											} else {
+												k->side_button_movement += dx;
+												if (k->side_button_movement > 100) {
+													k->side_button_movement = 100;
+													buttons |= 0x10;
+												}
+											}
+										} else {
+											buttons &= ~0x18;
+											k->side_button_movement = 0;
 										}
 									} else {
 										buttons &= ~0x18;
 										k->side_button_movement = 0;
+										k->wheel_movement -= dy;
+										while (k->wheel_movement >= 10) {
+											k->wheel_movement -= 10;
+											dz--;
+										}
+										while (k->wheel_movement <= -10) {
+											k->wheel_movement += 10;
+											dz++;
+										}
 									}
+									dx = 0;
+									dy = 0;
 								} else {
 									buttons &= ~0x18;
 									k->side_button_movement = 0;
-									k->wheel_movement -= dy;
-									while (k->wheel_movement >= 10) {
-										k->wheel_movement -= 10;
-										dz--;
-									}
-									while (k->wheel_movement <= -10) {
-										k->wheel_movement += 10;
-										dz++;
-									}
-								}
-								dx = 0;
-								dy = 0;
-							} else {
-								buttons &= ~0x18;
-								k->side_button_movement = 0;
-								k->wheel_movement = 0;
-								if (1) { // acceleration
-									int xx = dx * dx;
-									int yy = dy * dy;
-									if (xx + yy >= 9) {
-										if (xx + yy < 300) {
-											if (xx > yy) {
-												if (dx < 0) {
-													dx++;
-												} else {
-													dx--;
+									k->wheel_movement = 0;
+									if (1) { // acceleration
+										int xx = dx * dx;
+										int yy = dy * dy;
+										if (xx + yy >= 9) {
+											if (xx + yy < 300) {
+												if (xx > yy) {
+													if (dx < 0) {
+														dx++;
+													} else {
+														dx--;
+													}
+												}
+												if (xx < yy) {
+													if (dy < 0) {
+														dy++;
+													} else {
+														dy--;
+													}
 												}
 											}
-											if (xx < yy) {
-												if (dy < 0) {
-													dy++;
-												} else {
-													dy--;
-												}
-											}
+											dx *= 2;
+											dy *= 2;
 										}
-										dx *= 2;
-										dy *= 2;
 									}
 								}
 							}
