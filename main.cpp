@@ -30,6 +30,7 @@
 #include "usb.h"
 #include "avr.h"
 #include <string.h>
+#include "ps2.h"
 
 typedef struct key {
 	uint8_t value;
@@ -83,8 +84,12 @@ void led(int f)
 	}
 }
 
+uint8_t keys[32];
+
 void init()
 {
+	memset(keys, 0, sizeof(keys));
+
 	PORTB = 0x00;
 	PORTC = 0x00;
 	DDRB = 0x01;
@@ -133,7 +138,7 @@ int main()
 	sei();
 
 	while (1) {
-		if (1) {
+		{ // mouse
 			static int last_buttons = 0;
 			memset(keyboard_data, 0, sizeof(keyboard_data));
 			int buttons = mouse.buttons;
@@ -152,17 +157,66 @@ int main()
 				usb_mouse_send();
 			}
 		}
-		quckey_loop();
+		{ // keyboard
+			quckey_loop();
+		}
 	}
 }
 
-void press_key(uint8_t c)
+void send_keys()
 {
-	memset(keyboard_data, 0, sizeof(keyboard_data));
-	keyboard_data[0] = c;
+	memset(keyboard_data, 0, 6);
+	keyboard_modifier_keys = 0;
+
+	auto Pressed = [&](uint8_t k){
+		return (keys[k >> 3] >> (k & 7)) & 1;
+	};
+
+	auto Push = [&](uint8_t k){
+		memmove(keyboard_data + 1, keyboard_data, 5);
+		keyboard_data[0] = k;
+	};
+
+	int k = 0xdf;
+	while (k > 0) {
+		if (Pressed(k)) {
+			Push(k);
+		}
+		k--;
+	}
+
+	for (int i = 0; i < 8; i++) {
+		if (Pressed(0xe0 + i) & 1) {
+			keyboard_modifier_keys |= 1 << i;
+		}
+	}
+//	if (Pressed(0xe0) & 1) { keyboard_modifier_keys |= 0x01; }
+//	if (Pressed(0xe1) & 1) { keyboard_modifier_keys |= 0x02; }
+//	if (Pressed(0xe2) & 1) { keyboard_modifier_keys |= 0x04; }
+//	if (Pressed(0xe3) & 1) { keyboard_modifier_keys |= 0x08; }
+//	if (Pressed(0xe4) & 1) { keyboard_modifier_keys |= 0x10; }
+//	if (Pressed(0xe5) & 1) { keyboard_modifier_keys |= 0x20; }
+//	if (Pressed(0xe6) & 1) { keyboard_modifier_keys |= 0x40; }
+//	if (Pressed(0xe7) & 1) { keyboard_modifier_keys |= 0x80; }
+
 	usb_keyboard_send();
-	keyboard_data[0] = 0;
-	usb_keyboard_send();
+}
+
+void press_key(uint8_t key)
+{
+//	memset(keyboard_data, 0, sizeof(keyboard_data));
+//	keyboard_data[0] = key;
+//	usb_keyboard_send();
+//	keyboard_data[0] = 0;
+//	usb_keyboard_send();
+	keys[key >> 3] |= 1 << (key & 7);
+	send_keys();
+}
+
+void release_key(uint8_t key)
+{
+	keys[key >> 3] &= ~(1 << (key & 7));
+	send_keys();
 }
 
 void usb_puthex(int c)

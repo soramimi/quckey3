@@ -17,9 +17,11 @@ typedef struct Queue16 Queue;
 #define qunget(Q,C) q16unget(Q,C)
 
 extern void led(int f);
-extern void press_key(uint8_t c);
+extern void press_key(uint8_t key);
+extern void release_key(uint8_t key);
 void change_mouse(int dx, int dy, int dz, int buttons);
 extern void usb_puthex(int c);
+extern volatile uint8_t keyboard_leds;
 
 uint8_t quckey_timerevent = 0; // 1ms interval event
 
@@ -145,10 +147,9 @@ struct PS2Device {
 	uint8_t mouse_buttons = 0;
 	uint8_t mouse_buttons2 = 0;
 
-	uint16_t repeat_timeout;
-	uint8_t decode_state;
-	uint8_t shiftflags;
-	uint8_t indicator;
+	uint16_t repeat_timeout = 0;
+	uint8_t decode_state = 0;
+	uint8_t indicator = 0;
 
 	uint16_t typematic;
 	int typematic_rate;  // ms
@@ -435,6 +436,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 				k->mouse_received = 0;
 			}
 		}
+
 		cli();
 		if (k->timeout > 0) {
 			if (k->timeout > 1) {
@@ -448,6 +450,17 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			}
 		}
 		sei();
+
+		if (k->mouse_device_type == Keyboard) {
+			uint8_t leds = 0;
+			if (keyboard_leds & 1) leds |= 2; // num lock
+			if (keyboard_leds & 2) leds |= 4; // caps lock
+			if (keyboard_leds & 4) leds |= 1; // scroll lock
+			if (k->indicator != leds) {
+				k->indicator = leds;
+				put_event(k, EVENT_SEND_KB_INDICATOR);
+			}
+		}
 	}
 
 	event = get_event(k);
@@ -462,26 +475,11 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			c = event & 0xff;
 			c = convert_scan_code_ibm_to_hid(c);
 			press_key(c);
-			switch (c) {
-			case 44:	k->shiftflags |= KEYFLAG_SHIFT_L;   break;
-			case 57:	k->shiftflags |= KEYFLAG_SHIFT_R;   break;
-			case 58:	k->shiftflags |= KEYFLAG_CTRL_L;    break;
-			case 64:	k->shiftflags |= KEYFLAG_CTRL_R;    break;
-			case 60:	k->shiftflags |= KEYFLAG_ALT_L;     break;
-			case 62:	k->shiftflags |= KEYFLAG_ALT_R;     break;
-			}
 			break;
 		case EVENT_KEYBREAK:
 			c = event & 0xff;
-			press_key(0);
-			switch (c) {
-			case 44:	k->shiftflags &= ~KEYFLAG_SHIFT_L;  break;
-			case 57:	k->shiftflags &= ~KEYFLAG_SHIFT_R;  break;
-			case 58:	k->shiftflags &= ~KEYFLAG_CTRL_L;   break;
-			case 64:	k->shiftflags &= ~KEYFLAG_CTRL_R;   break;
-			case 60:	k->shiftflags &= ~KEYFLAG_ALT_L;    break;
-			case 62:	k->shiftflags &= ~KEYFLAG_ALT_R;    break;
-			}
+			c = convert_scan_code_ibm_to_hid(c);
+			release_key(c);
 			break;
 		case EVENT_SEND_KB_INDICATOR:
 			if (k->state != PS2_NORMAL) {
@@ -843,7 +841,6 @@ void init_keyboard(PS2Device *k)
 	k->receive_timeout = 0;
 
 	k->decode_state = 0;
-	k->shiftflags = 0;
 	k->indicator = 0;
 	change_typematic(k, 0x23);
 	k->real_device_id = 0x83ab;

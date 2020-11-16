@@ -4,21 +4,6 @@
 
 #include <stdint.h>
 
-enum {
-	KEYFLAG_SHIFT_L = 0x01,
-	KEYFLAG_SHIFT_R = 0x02,
-	KEYFLAG_SHIFT = 0x03,
-	KEYFLAG_CTRL_L = 0x04,
-	KEYFLAG_CTRL_R = 0x08,
-	KEYFLAG_CTRL = 0x0c,
-	KEYFLAG_ALT_L = 0x10,
-	KEYFLAG_ALT_R = 0x20,
-	KEYFLAG_ALT = 0x30,
-	KEYFLAG_NUMLOCK = 0x40,
-	KEYFLAG_MAKE = 0x80,
-};
-
-
 uint8_t convert_scan_code_ibm_to_hid(uint8_t c);
 
 uint16_t ps2decode(uint8_t *state, uint8_t c);
