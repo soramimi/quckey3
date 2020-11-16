@@ -637,7 +637,11 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 		}
 
 		if (c >= 0) {
+			if (c == 0xaa) {
+				k->reset_timer = 100;
+			}
 			if (k->real_device_id == 0) { // mouse
+				k->receive_timeout = 10;
 				if (k->mouse_received < 3) {
 					k->mouse_buffer[k->mouse_received++] = c;
 					if (k->mouse_received >= 3) {
@@ -711,39 +715,41 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 									buttons &= ~0x18;
 									k->side_button_movement = 0;
 									k->wheel_movement = 0;
-									if (1) { // acceleration
-										int xx = dx * dx;
-										int yy = dy * dy;
-										if (xx + yy >= 9) {
-											if (xx + yy < 300) {
-												if (xx > yy) {
-													if (dx < 0) {
-														dx++;
-													} else {
-														dx--;
-													}
-												}
-												if (xx < yy) {
-													if (dy < 0) {
-														dy++;
-													} else {
-														dy--;
-													}
-												}
+								}
+							}
+
+							if (1) { // acceleration
+								int xx = dx * dx;
+								int yy = dy * dy;
+								if (xx + yy >= 9) {
+									if (xx + yy < 300) {
+										if (xx > yy) {
+											if (dx < 0) {
+												dx++;
+											} else {
+												dx--;
 											}
-											dx *= 2;
-											dy *= 2;
+										}
+										if (xx < yy) {
+											if (dy < 0) {
+												dy++;
+											} else {
+												dy--;
+											}
 										}
 									}
+									dx *= 2;
+									dy *= 2;
 								}
 							}
 
 							change_mouse(dx, -dy, dz, buttons);
 						}
 						k->mouse_received = 0;
+						k->receive_timeout = 0;
+						k->reset_timer = 0;
 					}
 				}
-				k->receive_timeout = 10;
 			} else { // keyboard
 				switch (c) {
 				case 0xaa:
