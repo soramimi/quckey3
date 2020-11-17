@@ -659,11 +659,17 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 							int dy = k->mouse_buffer[2];
 							if (flags & 0x10) dx |= -1 << 8;
 							if (flags & 0x20) dy |= -1 << 8;
-							int buttons = k->mouse_buttons;
+							int buttons = 0;
+							bool b4th = false;
+							{
+								if (k->mouse_buttons & 0x01) buttons |= 1; // left
+								if (k->mouse_buttons & 0x02) buttons |= 2; // right
+								if (k->mouse_buttons & 0x08) buttons |= 4; // middle
+								b4th = k->mouse_buttons & 0x04;
+							}
 
 							if (k->mouse_device_type == TrackManMarbleFX) {
-								buttons &= 0x07;
-								if (k->mouse_buttons & 0x08) {
+								if (b4th) {
 									if (abs(dx) > abs(dy)) {
 										k->wheel_movement = 0;
 										if (dx < 0) {
