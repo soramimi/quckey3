@@ -35,16 +35,16 @@
  **************************************************************************/
 
 // You can change these to give your code its own name.
-#define STR_MANUFACTURER	L"MfgName"
-#define STR_PRODUCT		L"Keyboard"
+#define STR_MANUFACTURER	L"soramimi@soramimi.jp"
+#define STR_PRODUCT		L"Quckey3"
 
 
 // Mac OS-X and Linux automatically load the correct drivers.  On
 // Windows, even though the driver is supplied by Microsoft, an
 // INF file is needed to load the driver.  These numbers need to
 // match the INF file.
-#define VENDOR_ID		0x16C0
-#define PRODUCT_ID		0x047D
+#define VENDOR_ID		0x16c0
+#define PRODUCT_ID		0x0482
 
 
 // USB devices are supposed to implment a halt feature, which is
@@ -112,7 +112,6 @@ static const uint8_t PROGMEM device_descriptor[] = {
 	1					// bNumConfigurations
 };
 
-#if 1
 // Keyboard Protocol 1, HID 1.11 spec, Appendix B, page 59-60
 static const uint8_t PROGMEM keyboard_hid_report_desc[] = {
 	0x05, 0x01,          // Usage Page (Generic Desktop),
@@ -148,43 +147,7 @@ static const uint8_t PROGMEM keyboard_hid_report_desc[] = {
 	0x81, 0x00,          //   Input (Data, Array),
 	0xc0                 // End Collection
 };
-#else
-const PROGMEM uint8_t keyboard_hid_report_desc[] = {   /* USB report descriptor */
-	0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
-	0x09, 0x06,                    // USAGE (Keyboard)
-	0xa1, 0x01,                    // COLLECTION (Application)
-	0x05, 0x07,                    //   USAGE_PAGE (Keyboard)
-	0x19, 0xe0,                    //   USAGE_MINIMUM (Keyboard LeftControl)
-	0x29, 0xe7,                    //   USAGE_MAXIMUM (Keyboard Right GUI)
-	0x15, 0x00,                    //   LOGICAL_MINIMUM (0)
-	0x25, 0x01,                    //   LOGICAL_MAXIMUM (1)
-	0x75, 0x01,                    //   REPORT_SIZE (1)
-	0x95, 0x08,                    //   REPORT_COUNT (8)
-	0x81, 0x02,                    //   INPUT (Data,Var,Abs)
-	0x95, 0x01,                    //   REPORT_COUNT (1)
-	0x75, 0x08,                    //   REPORT_SIZE (8)
-	0x25, 0x65,                    //   LOGICAL_MAXIMUM (101)
-	0x19, 0x00,                    //   USAGE_MINIMUM (Reserved (no event indicated))
-	0x29, 0x65,                    //   USAGE_MAXIMUM (Keyboard Application)
-	0x81, 0x00,                    //   INPUT (Data,Ary,Abs)
-	0xc0                           // END_COLLECTION
-};
-#endif
 
-#if 0
-static const uint8_t PROGMEM debug_hid_report_desc[] = {
-	0x06, 0x31, 0xFF,			// Usage Page 0xFF31 (vendor defined)
-	0x09, 0x74,				// Usage 0x74
-	0xA1, 0x53,				// Collection 0x53
-	0x75, 0x08,				// report size = 8 bits
-	0x15, 0x00,				// logical minimum = 0
-	0x26, 0xFF, 0x00,			// logical maximum = 255
-	0x95, DEBUG_TX_SIZE,			// report count
-	0x09, 0x75,				// usage
-	0x81, 0x02,				// Input (array)
-	0xC0					// end collection
-};
-#else
 const PROGMEM uint8_t mouse_hid_report_desc[] = {   /* USB report descriptor */
 	0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
 	0x09, 0x02,                    // USAGE (Mouse)
@@ -214,77 +177,7 @@ const PROGMEM uint8_t mouse_hid_report_desc[] = {   /* USB report descriptor */
 	0xC0,                          //   END_COLLECTION
 	0xC0,                          // END COLLECTION
 };
-#endif
 
-#if 0
-#define CONFIG1_DESC_SIZE        (9+9+9+7+9+9+7)
-#define KEYBOARD_HID_DESC_OFFSET (9+9)
-#define DEBUG_HID_DESC_OFFSET    (9+9+9+7+9)
-static const uint8_t PROGMEM config1_descriptor[CONFIG1_DESC_SIZE] = {
-	// configuration descriptor, USB spec 9.6.3, page 264-266, Table 9-10
-	9, 					// bLength;
-	2,					// bDescriptorType;
-	LSB(CONFIG1_DESC_SIZE),			// wTotalLength
-	MSB(CONFIG1_DESC_SIZE),
-	2,					// bNumInterfaces
-	1,					// bConfigurationValue
-	0,					// iConfiguration
-	0xC0,					// bmAttributes
-	50,					// bMaxPower
-	// interface descriptor, USB spec 9.6.5, page 267-269, Table 9-12
-	9,					// bLength
-	4,					// bDescriptorType
-	KEYBOARD_INTERFACE,			// bInterfaceNumber
-	0,					// bAlternateSetting
-	1,					// bNumEndpoints
-	0x03,					// bInterfaceClass (0x03 = HID)
-	0x01,					// bInterfaceSubClass (0x01 = Boot)
-	0x01,					// bInterfaceProtocol (0x01 = Keyboard)
-	0,					// iInterface
-	// HID interface descriptor, HID 1.11 spec, section 6.2.1
-	9,					// bLength
-	0x21,					// bDescriptorType
-	0x11, 0x01,				// bcdHID
-	0,					// bCountryCode
-	1,					// bNumDescriptors
-	0x22,					// bDescriptorType
-	sizeof(keyboard_hid_report_desc),	// wDescriptorLength
-	0,
-	// endpoint descriptor, USB spec 9.6.6, page 269-271, Table 9-13
-	7,					// bLength
-	5,					// bDescriptorType
-	KEYBOARD_ENDPOINT | 0x80,		// bEndpointAddress
-	0x03,					// bmAttributes (0x03=intr)
-	KEYBOARD_SIZE, 0,			// wMaxPacketSize
-	1,					// bInterval
-	// interface descriptor, USB spec 9.6.5, page 267-269, Table 9-12
-	9,					// bLength
-	4,					// bDescriptorType
-	DEBUG_INTERFACE,			// bInterfaceNumber
-	0,					// bAlternateSetting
-	1,					// bNumEndpoints
-	0x03,					// bInterfaceClass (0x03 = HID)
-	0x00,					// bInterfaceSubClass
-	0x00,					// bInterfaceProtocol
-	0,					// iInterface
-	// HID interface descriptor, HID 1.11 spec, section 6.2.1
-	9,					// bLength
-	0x21,					// bDescriptorType
-	0x11, 0x01,				// bcdHID
-	0,					// bCountryCode
-	1,					// bNumDescriptors
-	0x22,					// bDescriptorType
-	sizeof(debug_hid_report_desc),		// wDescriptorLength
-	0,
-	// endpoint descriptor, USB spec 9.6.6, page 269-271, Table 9-13
-	7,					// bLength
-	5,					// bDescriptorType
-	DEBUG_TX_ENDPOINT | 0x80,		// bEndpointAddress
-	0x03,					// bmAttributes (0x03=intr)
-	DEBUG_TX_SIZE, 0,			// wMaxPacketSize
-	1					// bInterval
-};
-#else
 #define KEYBOARD_HID_DESC_OFFSET (9+9)
 #define DEBUG_HID_DESC_OFFSET    (9+9+9+7+9)
 PROGMEM const uint8_t config1_descriptor[] = {    /* USB configuration descriptor */
@@ -357,7 +250,6 @@ PROGMEM const uint8_t config1_descriptor[] = {    /* USB configuration descripto
 	8, 0,       /* maximum packet size */
 	10 /*USB_CFG_INTR_POLL_INTERVAL*/, /* in ms */
 };
-#endif
 
 // If you're desperate for a little extra code memory, these strings
 // can be completely removed if iManufacturer, iProduct, iSerialNumber
@@ -460,7 +352,7 @@ void usb_init()
 	USB_CONFIG();				// start USB clock
 	UDCON = 0;				// enable attach resistor
 	usb_configuration = 0;
-	UDIEN = (1<<EORSTE)|(1<<SOFE);
+	UDIEN = (1<<EORSTE) | (1<<SOFE);
 	sei();
 }
 
@@ -498,7 +390,7 @@ int8_t usb_keyboard_send()
 	timeout = UDFNUML + 50;
 	while (1) {
 		// are we ready to transmit?
-		if (UEINTX & (1<<RWAL)) break;
+		if (UEINTX & (1 << RWAL)) break;
 		SREG = intr_state;
 		// has the USB gone offline?
 		if (!usb_configuration) return -1;
@@ -531,7 +423,7 @@ int8_t usb_mouse_send()
 	timeout = UDFNUML + 50;
 	while (1) {
 		// are we ready to transmit?
-		if (UEINTX & (1<<RWAL)) break;
+		if (UEINTX & (1 << RWAL)) break;
 		SREG = intr_state;
 		// has the USB gone offline?
 		if (!usb_configuration) return -1;
@@ -553,49 +445,6 @@ int8_t usb_mouse_send()
 	return 0;
 }
 
-#if 0
-void jump_bootloader()
-{
-	cli();
-	UDCON = 1;
-	USBCON = (1<<FRZCLK);  // disable USB
-	UCSR1B = 0;
-	_delay_ms(5);
-	// ATmega32u2
-#if defined(__AVR_ATmega32U2__)
-	EIMSK = 0; PCICR = 0; SPCR = 0; ACSR = 0; EECR = 0;
-	TIMSK0 = 0; TIMSK1 = 0; UCSR1B = 0;
-	DDRB = 0; DDRC = 0; DDRD = 0;
-	PORTB = 0; PORTC = 0; PORTD = 0;
-	// ATmega32u4, Teensy 2.0
-#elif defined(__AVR_ATmega32U4__)
-	EIMSK = 0; PCICR = 0; SPCR = 0; ACSR = 0; EECR = 0; ADCSRA = 0;
-	TIMSK0 = 0; TIMSK1 = 0; TIMSK3 = 0; TIMSK4 = 0; UCSR1B = 0; TWCR = 0;
-	DDRB = 0; DDRC = 0; DDRD = 0; DDRE = 0; DDRF = 0; TWCR = 0;
-	PORTB = 0; PORTC = 0; PORTD = 0; PORTE = 0; PORTF = 0;
-	// AT90USB162, Teensy 1.0
-#elif defined(__AVR_AT90USB162__)
-	EIMSK = 0; PCICR = 0; SPCR = 0; ACSR = 0; EECR = 0;
-	TIMSK0 = 0; TIMSK1 = 0; UCSR1B = 0;
-	DDRB = 0; DDRC = 0; DDRD = 0;
-	PORTB = 0; PORTC = 0; PORTD = 0;
-	// AT90USB646, Teensy++ 1.0
-#elif defined(__AVR_AT90USB646__)
-	EIMSK = 0; PCICR = 0; SPCR = 0; ACSR = 0; EECR = 0; ADCSRA = 0;
-	TIMSK0 = 0; TIMSK1 = 0; TIMSK2 = 0; TIMSK3 = 0; UCSR1B = 0; TWCR = 0;
-	DDRA = 0; DDRB = 0; DDRC = 0; DDRD = 0; DDRE = 0; DDRF = 0;
-	PORTA = 0; PORTB = 0; PORTC = 0; PORTD = 0; PORTE = 0; PORTF = 0;
-	// AT90USB1286, Teensy++ 2.0
-#elif defined(__AVR_AT90USB1286__)
-	EIMSK = 0; PCICR = 0; SPCR = 0; ACSR = 0; EECR = 0; ADCSRA = 0;
-	TIMSK0 = 0; TIMSK1 = 0; TIMSK2 = 0; TIMSK3 = 0; UCSR1B = 0; TWCR = 0;
-	DDRA = 0; DDRB = 0; DDRC = 0; DDRD = 0; DDRE = 0; DDRF = 0;
-	PORTA = 0; PORTB = 0; PORTC = 0; PORTD = 0; PORTE = 0; PORTF = 0;
-#endif
-	asm volatile(__BOOTLOADER_JUMP);
-}
-#endif
-
 // transmit a character.  0 returned on success, -1 on error
 int8_t usb_debug_putchar(uint8_t c)
 {
@@ -612,7 +461,7 @@ int8_t usb_debug_putchar(uint8_t c)
 	UENUM = MOUSE_ENDPOINT;
 	// if we gave up due to timeout before, don't wait again
 	if (previous_timeout) {
-		if (!(UEINTX & (1<<RWAL))) {
+		if (!(UEINTX & (1 << RWAL))) {
 			SREG = intr_state;
 			return -1;
 		}
@@ -622,7 +471,7 @@ int8_t usb_debug_putchar(uint8_t c)
 	timeout = UDFNUML + 4;
 	while (1) {
 		// are we ready to transmit?
-		if (UEINTX & (1<<RWAL)) break;
+		if (UEINTX & (1 << RWAL)) break;
 		SREG = intr_state;
 		// have we waited too long?
 		if (UDFNUML == timeout) {
@@ -639,7 +488,7 @@ int8_t usb_debug_putchar(uint8_t c)
 	// actually write the byte into the FIFO
 	UEDATX = c;
 	// if this completed a packet, transmit it now!
-	if (!(UEINTX & (1<<RWAL))) {
+	if (!(UEINTX & (1 << RWAL))) {
 		UEINTX = 0x3A;
 		debug_flush_timer = 0;
 	} else {
@@ -659,7 +508,7 @@ void usb_debug_flush_output()
 	cli();
 	if (debug_flush_timer) {
 		UENUM = MOUSE_ENDPOINT;
-		while ((UEINTX & (1<<RWAL))) {
+		while ((UEINTX & (1 << RWAL))) {
 			UEDATX = 0;
 		}
 		UEINTX = 0x3A;
@@ -683,49 +532,18 @@ void usb_debug_flush_output()
 //
 ISR(USB_GEN_vect)
 {
-	uint8_t intbits, t, i;
-	static uint8_t div4=0;
+	uint8_t intbits;
 
 	intbits = UDINT;
 	UDINT = 0;
-	if (intbits & (1<<EORSTI)) {
+	if (intbits & (1 << EORSTI)) {
 		UENUM = 0;
 		UECONX = 1;
 		UECFG0X = EP_TYPE_CONTROL;
 		UECFG1X = EP_SIZE(ENDPOINT0_SIZE) | EP_SINGLE_BUFFER;
-		UEIENX = (1<<RXSTPE);
+		UEIENX = (1 << RXSTPE);
 		usb_configuration = 0;
 	}
-#if 0
-	if ((intbits & (1<<SOFI)) && usb_configuration) {
-		t = debug_flush_timer;
-		if (t) {
-			debug_flush_timer = -- t;
-			if (!t) {
-				UENUM = MOUSE_ENDPOINT;
-				while ((UEINTX & (1<<RWAL))) {
-					UEDATX = 0;
-				}
-				UEINTX = 0x3A;
-			}
-		}
-		if (keyboard_idle_config && (++div4 & 3) == 0) {
-			UENUM = KEYBOARD_ENDPOINT;
-			if (UEINTX & (1<<RWAL)) {
-				keyboard_idle_count++;
-				if (keyboard_idle_count == keyboard_idle_config) {
-					keyboard_idle_count = 0;
-					UEDATX = keyboard_modifier_keys;
-					UEDATX = 0;
-					for (i=0; i<6; i++) {
-						UEDATX = keyboard_data[i];
-					}
-					UEINTX = 0x3A;
-				}
-			}
-		}
-	}
-#endif
 }
 
 
@@ -733,19 +551,19 @@ ISR(USB_GEN_vect)
 // Misc functions to wait for ready and send/receive packets
 static inline void usb_wait_in_ready()
 {
-	while (!(UEINTX & (1<<TXINI))) ;
+	while (!(UEINTX & (1 << TXINI))) ;
 }
 static inline void usb_send_in()
 {
-	UEINTX = ~(1<<TXINI);
+	UEINTX = ~(1 << TXINI);
 }
 static inline void usb_wait_receive_out()
 {
-	while (!(UEINTX & (1<<RXOUTI))) ;
+	while (!(UEINTX & (1 << RXOUTI))) ;
 }
 static inline void usb_ack_out()
 {
-	UEINTX = ~(1<<RXOUTI);
+	UEINTX = ~(1 << RXOUTI);
 }
 
 
@@ -771,7 +589,7 @@ ISR(USB_COM_vect)
 
 	UENUM = 0;
 	intbits = UEINTX;
-	if (intbits & (1<<RXSTPI)) {
+	if (intbits & (1 << RXSTPI)) {
 		bmRequestType = UEDATX;
 		bRequest = UEDATX;
 		wValue = UEDATX;
@@ -780,12 +598,12 @@ ISR(USB_COM_vect)
 		wIndex |= (UEDATX << 8);
 		wLength = UEDATX;
 		wLength |= (UEDATX << 8);
-		UEINTX = ~((1<<RXSTPI) | (1<<RXOUTI) | (1<<TXINI));
+		UEINTX = ~((1 << RXSTPI) | (1 << RXOUTI) | (1 << TXINI));
 		if (bRequest == GET_DESCRIPTOR) {
 			list = (const uint8_t *)descriptor_list;
-			for (i=0; ; i++) {
+			for (i = 0; ; i++) {
 				if (i >= NUM_DESC_LIST) {
-					UECONX = (1<<STALLRQ)|(1<<EPEN);  //stall
+					UECONX = (1 << STALLRQ) | (1 << EPEN);  //stall
 					return;
 				}
 				desc_val = pgm_read_word(list);
@@ -811,8 +629,8 @@ ISR(USB_COM_vect)
 				// wait for host ready for IN packet
 				do {
 					i = UEINTX;
-				} while (!(i & ((1<<TXINI)|(1<<RXOUTI))));
-				if (i & (1<<RXOUTI)) return;	// abort
+				} while (!(i & ((1 << TXINI) | (1 << RXOUTI))));
+				if (i & (1 << RXOUTI)) return;	// abort
 				// send IN packet
 				n = len < ENDPOINT0_SIZE ? len : ENDPOINT0_SIZE;
 				for (i = n; i; i--) {
@@ -826,14 +644,14 @@ ISR(USB_COM_vect)
 		if (bRequest == SET_ADDRESS) {
 			usb_send_in();
 			usb_wait_in_ready();
-			UDADDR = wValue | (1<<ADDEN);
+			UDADDR = wValue | (1 << ADDEN);
 			return;
 		}
 		if (bRequest == SET_CONFIGURATION && bmRequestType == 0) {
 			usb_configuration = wValue;
 			usb_send_in();
 			cfg = endpoint_config_table;
-			for (i=1; i<5; i++) {
+			for (i = 1; i < 5; i++) {
 				UENUM = i;
 				en = pgm_read_byte(cfg++);
 				UECONX = en;
@@ -859,7 +677,7 @@ ISR(USB_COM_vect)
 #ifdef SUPPORT_ENDPOINT_HALT
 			if (bmRequestType == 0x82) {
 				UENUM = wIndex;
-				if (UECONX & (1<<STALLRQ)) i = 1;
+				if (UECONX & (1 << STALLRQ)) i = 1;
 				UENUM = 0;
 			}
 #endif
@@ -876,9 +694,9 @@ ISR(USB_COM_vect)
 				usb_send_in();
 				UENUM = i;
 				if (bRequest == SET_FEATURE) {
-					UECONX = (1<<STALLRQ)|(1<<EPEN);
+					UECONX = (1 << STALLRQ) | (1 << EPEN);
 				} else {
-					UECONX = (1<<STALLRQC)|(1<<RSTDT)|(1<<EPEN);
+					UECONX = (1 << STALLRQC) | (1 << RSTDT) | (1 << EPEN);
 					UERST = (1 << i);
 					UERST = 0;
 				}
@@ -892,7 +710,7 @@ ISR(USB_COM_vect)
 					usb_wait_in_ready();
 					UEDATX = keyboard_modifier_keys;
 					UEDATX = 0;
-					for (i=0; i<6; i++) {
+					for (i = 0; i < 6; i++) {
 						UEDATX = keyboard_data[i];
 					}
 					usb_send_in();
@@ -941,8 +759,8 @@ ISR(USB_COM_vect)
 					// wait for host ready for IN packet
 					do {
 						i = UEINTX;
-					} while (!(i & ((1<<TXINI)|(1<<RXOUTI))));
-					if (i & (1<<RXOUTI)) return;	// abort
+					} while (!(i & ((1 << TXINI) | (1 << RXOUTI))));
+					if (i & (1 << RXOUTI)) return;	// abort
 					// send IN packet
 					n = len < ENDPOINT0_SIZE ? len : ENDPOINT0_SIZE;
 					for (i = n; i; i--) {
@@ -955,7 +773,7 @@ ISR(USB_COM_vect)
 			}
 		}
 	}
-	UECONX = (1<<STALLRQ) | (1<<EPEN);	// stall
+	UECONX = (1 << STALLRQ) | (1 << EPEN);	// stall
 }
 
 
