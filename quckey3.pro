@@ -2,12 +2,13 @@
 INCLUDEPATH += /usr/lib/avr/include
 
 HEADERS += \
-    avr.h \
     usb.h \
     ps2.h \
     ps2if.h \
     queue16.h \
-    waitloop.h
+    waitloop.h \
+    avrgpio.h \
+    lcd.h
 SOURCES += \
     usb.c \
     main.c \
@@ -18,4 +19,5 @@ SOURCES += \
     quckey.cpp \
     queue16.cpp \
     waitloop.cpp \
-    ps2dec.cpp
+    ps2dec.cpp \
+    lcd.cpp

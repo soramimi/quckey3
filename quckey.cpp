@@ -20,7 +20,6 @@ extern void led(int f);
 extern void press_key(uint8_t key);
 extern void release_key(uint8_t key);
 void change_mouse(int dx, int dy, int dz, int buttons);
-extern void usb_puthex(int c);
 extern volatile uint8_t keyboard_leds;
 
 uint8_t quckey_timerevent = 0; // 1ms interval event
@@ -861,7 +860,7 @@ void init_keyboard(PS2Device *k)
 	put_event(k, EVENT_INIT);
 }
 
-void quckey_setup()
+void keyboard_setup()
 {
 	ps2k0.io = &ps2kb0io;
 	ps2k1.io = &ps2kb1io;
@@ -877,7 +876,7 @@ void quckey_setup()
 	init_keyboard(&ps2k1);
 }
 
-void quckey_loop()
+void keyboard_loop()
 {
 	cli();
 	bool timerevent = quckey_timerevent;

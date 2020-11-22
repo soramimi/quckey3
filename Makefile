@@ -102,6 +102,7 @@ SHELL = sh
 
 # Define all object files.
 OBJ = \
+	lcd.o \
 	ps2dec.o \
 	ps2dec001.o \
 	ps2dec002.o \
