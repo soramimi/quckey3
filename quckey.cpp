@@ -8,6 +8,7 @@
 #include "ps2if.h"
 #include "waitloop.h"
 #include <stdlib.h>
+#include "lcd.h"
 
 typedef struct Queue16 Queue;
 #define qinit(Q) q16init(Q)
@@ -26,7 +27,10 @@ uint8_t quckey_timerevent = 0; // 1ms interval event
 
 enum MouseDeviceType {
 	Keyboard,
-	NormalMouse,
+	GenericMouse,
+	IntelliMouseExplorer_00000a,
+	IntelliMouseExplorer_10000a,
+	IntelliMouseExplorer,
 	TrackManMarbleFX,
 };
 
@@ -34,8 +38,7 @@ enum {
 	I_CHECK = 0x100,
 	I_SEND = 0x200,
 	I_STORE = 0x300,
-	I_EVENT0 = 0x1000,
-	I_START,
+	I_EVENT = 0x1000,
 };
 
 #define CHECK(X) (I_CHECK | (X))
@@ -46,20 +49,20 @@ enum {
 PROGMEM static const uint16_t init_sequence_for_mouse[] = {
 	CHECK(0xfa), SEND(0xf2), 0, // get device id
 	CHECK(0xfa), 0,
-	SEND(0xf3), 0,        // set sample rate
+	SEND(0xf3), 0,              // set sample rate
 	CHECK(0xfa), SEND(10), 0,
 	CHECK(0xfa), SEND(0xf2), 0, // get device id
 	CHECK(0xfa), 0,
-	SEND(0xe8), 0,        // set resolution
+	SEND(0xe8), 0,              // set resolution
 	CHECK(0xfa), SEND(0), 0,
-	CHECK(0xfa), SEND(0xe6), 0, // set defaults
-	CHECK(0xfa), SEND(0xe6), 0, // set defaults
-	CHECK(0xfa), SEND(0xe6), 0, // set defaults
+	CHECK(0xfa), SEND(0xe6), 0, // set scaling 1:1
+	CHECK(0xfa), SEND(0xe6), 0, // set scaling 1:1
+	CHECK(0xfa), SEND(0xe6), 0, // set scaling 1:1
 	CHECK(0xfa), SEND(0xe9), 0, // status request
 	CHECK(0xfa), 0,
 	STORE(0), 0,
 	STORE(1), 0,
-	STORE(2), I_EVENT0,
+	STORE(2), EVENT(0),
 	0,
 };
 
@@ -78,12 +81,43 @@ PROGMEM static const uint16_t init_sequence_for_default_mouse[] = {
 	CHECK(0xfa), SEND(60), 0,
 	CHECK(0xfa), SEND(0xe8), 0, // set resolution
 	CHECK(0xfa), SEND(3), 0,
-	CHECK(0xfa), I_START,
+	SEND(0xf4), 0,              // enable data reporting
+	0
+};
+
+PROGMEM static const uint16_t init_sequence_for_intellimouseexplorer_mouse[] = {
+	SEND(0xe8), 0,              // set resolution
+	CHECK(0xfa), SEND(0), 0,
+	CHECK(0xfa), SEND(0xe7), 0, // set scaling 2:1
+	CHECK(0xfa), SEND(0xe7), 0, // set scaling 2:1
+	CHECK(0xfa), SEND(0xe7), 0, // set scaling 2:1
+	CHECK(0xfa), SEND(0xe9), 0, // status request
+	CHECK(0xfa), 0,
+	STORE(0), 0,
+	STORE(1), 0,
+	STORE(2), EVENT(1),
+	SEND(0xe8), 0,              // set resolution
+	CHECK(0xfa), SEND(3), 0,
+	CHECK(0xfa), SEND(0xf3), 0, // set sample rate
+	CHECK(0xfa), SEND(200), 0,
+	CHECK(0xfa), SEND(0xf3), 0, // set sample rate
+	CHECK(0xfa), SEND(200), 0,
+	CHECK(0xfa), SEND(0xf3), 0, // set sample rate
+	CHECK(0xfa), SEND(80), 0,
+	CHECK(0xfa), SEND(0xf2), 0, // get device id
+	CHECK(0xfa), 0,
+	STORE(0), EVENT(2),
+	SEND(0xe6), 0,              // set scaling 1:1,
+	CHECK(0xfa), SEND(0xf3), 0, // set sample rate
+	CHECK(0xfa), SEND(60), 0,
+	CHECK(0xfa), SEND(0xe8), 0, // set resolution
+	CHECK(0xfa), SEND(3), 0,
+	SEND(0xf4), 0,              // enable data reporting
 	0
 };
 
 PROGMEM static const uint16_t init_sequence_for_logitech_mouse[] = {
-	SEND(0xe6), 0,    // set defaults
+	SEND(0xe6), 0,              // set defaults
 	CHECK(0xfa), SEND(0xe8), 0, // set resolution
 	CHECK(0xfa), SEND(0), 0,
 	CHECK(0xfa), SEND(0xe8), 0, // set resolution
@@ -92,7 +126,7 @@ PROGMEM static const uint16_t init_sequence_for_logitech_mouse[] = {
 	CHECK(0xfa), SEND(2), 0,
 	CHECK(0xfa), SEND(0xe8), 0, // set resolution
 	CHECK(0xfa), SEND(1), 0,
-	CHECK(0xfa), SEND(0xe6), 0, // set defaults
+	CHECK(0xfa), SEND(0xe6), 0, // set scaling 1:1
 	CHECK(0xfa), SEND(0xe8), 0, // set resolution
 	CHECK(0xfa), SEND(3), 0,
 	CHECK(0xfa), SEND(0xe8), 0, // set resolution
@@ -109,12 +143,7 @@ PROGMEM static const uint16_t init_sequence_for_logitech_mouse[] = {
 	CHECK(0xfa), SEND(60), 0,
 	CHECK(0xfa), SEND(0xe8), 0, // set resolution
 	CHECK(0xfa), SEND(3), 0,
-	CHECK(0xfa), I_START,
-	0
-};
-
-PROGMEM static const uint16_t init_sequence_for_starting[] = {
-	SEND(0xf4), 0, // enable data reporting
+	SEND(0xf4), 0,              // enable data reporting
 	0
 };
 
@@ -144,7 +173,6 @@ struct PS2Device {
 	int side_button_movement = 0;
 	uint8_t mouse_buffer[4];
 	uint8_t mouse_buttons = 0;
-	uint8_t mouse_buttons2 = 0;
 
 	uint16_t repeat_timeout = 0;
 	uint8_t decode_state = 0;
@@ -502,16 +530,38 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			while (1) {
 				int t = pgm_read_word(k->init_sequece);
 				if (t == 0) break;
-				if (t == I_START) {
-					k->init_sequece = init_sequence_for_starting;
-				} else if (t == I_EVENT0) {
-					if (k->mouse_buffer[0] == 0x19 && k->mouse_buffer[1] == 0x03 && k->mouse_buffer[2] == 0xc8) {
+				auto UseDefaultMouse = [&](){
+					k->init_sequece = init_sequence_for_default_mouse;
+				};
+				switch (t) {
+				case EVENT(0):
+					if (k->mouse_buffer[0] == 0x00 && k->mouse_buffer[1] == 0x00 && k->mouse_buffer[2] == 0x0a) {
+						k->mouse_device_type = IntelliMouseExplorer_00000a;
+						k->init_sequece = init_sequence_for_intellimouseexplorer_mouse;
+					} else if (k->mouse_buffer[0] == 0x19 && k->mouse_buffer[1] == 0x03 && k->mouse_buffer[2] == 0xc8) {
 						k->mouse_device_type = TrackManMarbleFX;
 						k->init_sequece = init_sequence_for_logitech_mouse;
 					} else {
-						k->init_sequece = init_sequence_for_default_mouse;
+						UseDefaultMouse();
 					}
-				} else {
+					break;
+				case EVENT(1):
+					if (k->mouse_buffer[0] == 0x10 && k->mouse_buffer[1] == 0x00 && k->mouse_buffer[2] == 0x0a) {
+						k->mouse_device_type = IntelliMouseExplorer_10000a;
+						k->init_sequece++;
+					} else {
+						UseDefaultMouse();
+					}
+					break;
+				case EVENT(2):
+					if (k->mouse_buffer[0] == 0x04) {
+						k->mouse_device_type = IntelliMouseExplorer;
+						k->init_sequece++;
+					} else {
+						UseDefaultMouse();
+					}
+					break;
+				default:
 					switch (t & 0xff00) {
 					case I_CHECK:
 						if (c != (t & 0xff)) {
@@ -528,6 +578,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 						break;
 					}
 					k->init_sequece++;
+					break;
 				}
 			}
 			k->init_sequece++;
@@ -557,7 +608,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 				if (c == 0x00) { // mouse
 					k->real_device_id = 0;
 					k->fake_device_id = 0;
-					k->mouse_device_type = NormalMouse;
+					k->mouse_device_type = GenericMouse;
 					k->mouse_buffer[0] = 0;
 					k->mouse_buffer[1] = 0;
 					k->mouse_buffer[2] = 0;
@@ -639,35 +690,47 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			}
 			if (k->real_device_id == 0) { // mouse
 				k->receive_timeout = 10;
-				if (k->mouse_received < 3) {
+				int len = 3;
+				if (k->mouse_device_type == IntelliMouseExplorer) {
+					len = 4;
+				}
+				if (k->mouse_received < len) {
 					k->mouse_buffer[k->mouse_received++] = c;
-					if (k->mouse_received >= 3) {
-						int dz = 0;
+					if (k->mouse_received >= len) {
+						int wheel_delta = 0;
 						uint8_t flags = k->mouse_buffer[0];
 						if (flags & 0xc0) {
-							if ((flags & 0xc8) == 0xc8) {
-								if (k->mouse_buffer[1] == 0xd2) {
-									if (k->mouse_device_type == TrackManMarbleFX) {
-										k->mouse_buttons = (k->mouse_buttons & 0x07) | ((k->mouse_buffer[2] >> 1) & 0x08);
-									}
-								}
+							if (k->mouse_device_type == TrackManMarbleFX && (flags & 0xc8) == 0xc8 && k->mouse_buffer[1] == 0xd2) {
+								k->mouse_buttons = (k->mouse_buttons & 0x07) | ((k->mouse_buffer[2] >> 1) & 0x08);
 							}
 						} else {
-							k->mouse_buttons = (k->mouse_buttons & 0xf8) | (flags & 0x07);
 							int dx = k->mouse_buffer[1];
 							int dy = k->mouse_buffer[2];
 							if (flags & 0x10) dx |= -1 << 8;
 							if (flags & 0x20) dy |= -1 << 8;
 							int buttons = 0;
-							bool b4th = false;
-							{
-								if (k->mouse_buttons & 0x01) buttons |= 1; // left
-								if (k->mouse_buttons & 0x02) buttons |= 2; // right
-								if (k->mouse_buttons & 0x08) buttons |= 4; // middle
-								b4th = k->mouse_buttons & 0x04;
+							if (k->mouse_device_type != TrackManMarbleFX) {
+								k->mouse_buttons = flags & 0x07;
+								if (k->mouse_buttons & 0x01) buttons |= 0x01; // left
+								if (k->mouse_buttons & 0x02) buttons |= 0x02; // right
+								if (k->mouse_buttons & 0x04) buttons |= 0x04; // middle
+								if (k->mouse_device_type == IntelliMouseExplorer) {
+									k->mouse_buttons |= (k->mouse_buffer[3] >> 1) & 0x18;
+									if (k->mouse_buttons & 0x08) buttons |= 0x08; // middle
+									if (k->mouse_buttons & 0x10) buttons |= 0x10; // middle
+									wheel_delta = k->mouse_buffer[3] & 0x0f;
+									if (wheel_delta & 0x08) {
+										wheel_delta |= -1 << 4;
+									}
+									wheel_delta = -wheel_delta;
+								}
 							}
-
 							if (k->mouse_device_type == TrackManMarbleFX) {
+								k->mouse_buttons = (k->mouse_buttons & 0xf8) | (flags & 0x07);
+								if (k->mouse_buttons & 0x01) buttons |= 0x01; // left
+								if (k->mouse_buttons & 0x02) buttons |= 0x02; // right
+								if (k->mouse_buttons & 0x08) buttons |= 0x04; // middle
+								bool b4th = k->mouse_buttons & 0x04;
 								if (b4th) {
 									if (abs(dx) > abs(dy)) {
 										k->wheel_movement = 0;
@@ -705,11 +768,11 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 										k->wheel_movement -= dy;
 										while (k->wheel_movement >= 10) {
 											k->wheel_movement -= 10;
-											dz--;
+											wheel_delta--;
 										}
 										while (k->wheel_movement <= -10) {
 											k->wheel_movement += 10;
-											dz++;
+											wheel_delta++;
 										}
 									}
 									dx = 0;
@@ -746,7 +809,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 								}
 							}
 
-							change_mouse(dx, -dy, dz, buttons);
+							change_mouse(dx, -dy, wheel_delta, buttons);
 						}
 						k->mouse_received = 0;
 						k->receive_timeout = 0;

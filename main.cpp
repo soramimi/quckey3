@@ -131,7 +131,6 @@ static inline int clamp(int v, int min, int max)
 void mouse_loop()
 {
 	static int last_buttons = 0;
-	memset(keyboard_data, 0, sizeof(keyboard_data));
 	int buttons = mouse.buttons;
 	int dx = clamp(mouse.dx, -127, 127);
 	int dy = clamp(mouse.dy, -127, 127);
@@ -176,7 +175,7 @@ void setup()
 	lcd::init();
 	lcd::clear();
 	lcd::home();
-	lcd::print("Quckey3");
+//	lcd::print("Quckey3");
 
 	led(1);
 }
