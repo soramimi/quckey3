@@ -27,15 +27,16 @@
 #include "usb.h"
 #include <avr/interrupt.h>
 #include <string.h>
+#include "waitloop.h"
 
 #define CLOCK 16000000UL
 #define SCALE 125
 static unsigned short _scale = 0;
-static volatile unsigned long _system_tick_count;
-static volatile unsigned long _tick_count;
-static volatile unsigned long _time_s;
+static unsigned long _system_tick_count;
+static unsigned long _tick_count;
+static unsigned long _time_s;
 static unsigned short _time_ms;
-extern uint8_t quckey_timerevent;
+extern uint8_t interval_1ms_flag;
 ISR(TIMER0_OVF_vect, ISR_NOBLOCK)
 {
 	_system_tick_count++;
@@ -48,7 +49,7 @@ ISR(TIMER0_OVF_vect, ISR_NOBLOCK)
 			_time_ms = 0;
 			_time_s++;
 		}
-		quckey_timerevent = 1;
+		interval_1ms_flag = 1;
 	}
 }
 
@@ -167,7 +168,7 @@ void setup()
 
 	usb_init();
 	while (!usb_configured()) {
-		_delay_ms(100);
+		msleep(10);
 	}
 
 	keyboard_setup();

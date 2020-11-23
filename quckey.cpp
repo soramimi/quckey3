@@ -23,7 +23,7 @@ extern void release_key(uint8_t key);
 void change_mouse(int dx, int dy, int dz, int buttons);
 extern volatile uint8_t keyboard_leds;
 
-uint8_t quckey_timerevent = 0; // 1ms interval event
+uint8_t interval_1ms_flag = 0; // 1ms interval event
 
 enum MouseDeviceType {
 	Keyboard,
@@ -942,8 +942,8 @@ void keyboard_setup()
 void keyboard_loop()
 {
 	cli();
-	bool timerevent = quckey_timerevent;
-	quckey_timerevent = false;
+	bool timerevent = interval_1ms_flag;
+	interval_1ms_flag = false;
 	sei();
 
 	ps2_device_handler(&ps2k0, timerevent);
