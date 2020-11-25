@@ -53,7 +53,7 @@ ISR(TIMER0_OVF_vect, ISR_NOBLOCK)
 	}
 }
 
-void led(int f)
+extern "C" void led(int f)
 {
 	if (f) {
 		PORTB |= 0x01;
@@ -81,16 +81,15 @@ void change_mouse(int dx, int dy, int dz, int buttons)
 
 void send_keys()
 {
-	memset(keyboard_data, 0, 6);
-	keyboard_modifier_keys = 0;
+	memset(keyboard_data, 0, 8);
 
 	auto Pressed = [&](uint8_t k){
 		return (keys[k >> 3] >> (k & 7)) & 1;
 	};
 
 	auto Push = [&](uint8_t k){
-		memmove(keyboard_data + 1, keyboard_data, 5);
-		keyboard_data[0] = k;
+		memmove(keyboard_data + 3, keyboard_data + 2, 5);
+		keyboard_data[2] = k;
 	};
 
 	unsigned char k = 0xdf;
@@ -101,11 +100,13 @@ void send_keys()
 		k--;
 	}
 
+	uint8_t mods = 0;
 	for (unsigned char i = 0; i < 8; i++) {
 		if (Pressed(0xe0 + i) & 1) {
-			keyboard_modifier_keys |= 1 << i;
+			mods |= 1 << i;
 		}
 	}
+	keyboard_data[0] = mods;
 
 	usb_keyboard_send();
 }
@@ -176,9 +177,9 @@ void setup()
 	lcd::init();
 	lcd::clear();
 	lcd::home();
-//	lcd::print("Quckey3");
+	lcd::print("Quckey3");
 
-	led(1);
+//	led(1);
 }
 
 void loop()
@@ -194,5 +195,11 @@ int main()
 	while (1) {
 		loop();
 	}
+}
+
+extern "C" void print_hex(uint8_t v)
+{
+	lcd::home();
+	lcd::puthex8(v);
 }
 

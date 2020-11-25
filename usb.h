@@ -1,5 +1,5 @@
-#ifndef usb_serial_h__
-#define usb_serial_h__
+#ifndef USB_H
+#define USB_H
 
 #include <stdint.h>
 
@@ -7,18 +7,15 @@
 extern "C" {
 #endif
 
-void usb_init(void);			// initialize everything
-uint8_t usb_configured(void);		// is the USB port configured
+void usb_init();			// initialize everything
+uint8_t usb_configured();		// is the USB port configured
 
 int8_t usb_keyboard_send();
-int8_t usb_mouse_send(void);
-void jump_bootloader(void);
-extern uint8_t keyboard_modifier_keys;
-extern uint8_t keyboard_data[6];
+int8_t usb_mouse_send();
+
+extern uint8_t keyboard_data[8];
 extern uint8_t mouse_data[4];
 extern volatile uint8_t keyboard_leds;
-
-
 
 #ifdef __cplusplus
 }
@@ -33,8 +30,8 @@ extern volatile uint8_t keyboard_leds;
 #define EP_TYPE_CONTROL			0x00
 #define EP_TYPE_BULK_IN			0x81
 #define EP_TYPE_BULK_OUT		0x80
-#define EP_TYPE_INTERRUPT_IN		0xC1
-#define EP_TYPE_INTERRUPT_OUT		0xC0
+#define EP_TYPE_INTERRUPT_IN		0xc1
+#define EP_TYPE_INTERRUPT_OUT		0xc0
 #define EP_TYPE_ISOCHRONOUS_IN		0x41
 #define EP_TYPE_ISOCHRONOUS_OUT		0x40
 
@@ -105,4 +102,5 @@ extern volatile uint8_t keyboard_leds;
 #define CDC_GET_LINE_CODING		0x21
 #define CDC_SET_CONTROL_LINE_STATE	0x22
 #endif
+
 //#endif

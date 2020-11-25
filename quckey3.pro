@@ -10,7 +10,6 @@ HEADERS += \
     avrgpio.h \
     lcd.h
 SOURCES += \
-    usb.c \
     main.c \
     main.cpp \
     ps2dec001.cpp \
@@ -20,4 +19,5 @@ SOURCES += \
     queue16.cpp \
     waitloop.cpp \
     ps2dec.cpp \
-    lcd.cpp
+    lcd.cpp \
+    usb.c
