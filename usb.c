@@ -208,7 +208,7 @@ PROGMEM const uint8_t config_desc[] = {    /* USB configuration descriptor */
 	0, // alternate setting for this interface
 	1, // endpoints excl 0: number of endpoint descriptors to follow
 	3,
-	0,
+	1,
 	1,
 	0, // string index for interface
 
@@ -236,7 +236,7 @@ PROGMEM const uint8_t config_desc[] = {    /* USB configuration descriptor */
 	0, // alternate setting for this interface
 	1, // endpoints excl 0: number of endpoint descriptors to follow
 	3,
-	0,
+	1,
 	2,
 	0, // string index for interface
 
