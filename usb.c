@@ -25,12 +25,15 @@
 // Version 1.1: Add support for Teensy 2.0
 // 2012-09-07: Added the bootload jump routine /Fredrik Atmer
 
+// 2020-11-26: Quckey3 firmware - Copyright (C) 2020 S.Fuchita (@soramimi_jp)
+
 #define USB_SERIAL_PRIVATE_INCLUDE
 #include "usb.h"
 #include <stddef.h>
+#include "lcd.h"
 
 void led(int f);
-void print_hex(uint8_t v);
+void lcd_puthex8(uint8_t v);
 
 /**************************************************************************
  *
@@ -69,8 +72,8 @@ void print_hex(uint8_t v);
 #define MOUSE_BUFFER        EP_DOUBLE_BUFFER
 
 PROGMEM static const uint8_t endpoint_config_table[] = {
-	3, EP_TYPE_INTERRUPT_IN,  EP_SIZE(KEYBOARD_SIZE) | KEYBOARD_BUFFER,
-	4, EP_TYPE_INTERRUPT_IN,  EP_SIZE(MOUSE_SIZE) | MOUSE_BUFFER,
+	KEYBOARD_ENDPOINT, EP_TYPE_INTERRUPT_IN, EP_SIZE(KEYBOARD_SIZE) | KEYBOARD_BUFFER,
+	MOUSE_ENDPOINT,    EP_TYPE_INTERRUPT_IN, EP_SIZE(MOUSE_SIZE) | MOUSE_BUFFER,
 	0
 };
 
@@ -89,20 +92,20 @@ PROGMEM static const uint8_t endpoint_config_table[] = {
 
 
 PROGMEM static const uint8_t device_desc[] = {
-	18,					// bLength
-	1,					// bDescriptorType
-	0x00, 0x02,				// bcdUSB
-	0,					// bDeviceClass
-	0,					// bDeviceSubClass
-	0,					// bDeviceProtocol
-	ENDPOINT0_SIZE,				// bMaxPacketSize0
-	LSB(VENDOR_ID), MSB(VENDOR_ID),		// idVendor
-	LSB(PRODUCT_ID), MSB(PRODUCT_ID),	// idProduct
-	0x00, 0x01,				// bcdDevice
-	1,					// iManufacturer
-	2,					// iProduct
-	0,					// iSerialNumber
-	1					// bNumConfigurations
+	18,                  // bLength
+	1,                   // bDescriptorType
+	0x00, 0x02,          // bcdUSB
+	0,                   // bDeviceClass
+	0,                   // bDeviceSubClass
+	0,                   // bDeviceProtocol
+	ENDPOINT0_SIZE,      // bMaxPacketSize0
+	LSB(VENDOR_ID), MSB(VENDOR_ID),   // idVendor
+	LSB(PRODUCT_ID), MSB(PRODUCT_ID), // idProduct
+	0x00, 0x01,          // bcdDevice
+	1,                   // iManufacturer
+	2,                   // iProduct
+	0,                   // iSerialNumber
+	1                    // bNumConfigurations
 };
 
 // Keyboard Protocol 1, HID 1.11 spec, Appendix B, page 59-60
@@ -110,6 +113,7 @@ PROGMEM static const uint8_t keyboard_hid_report_desc[] = {
 	0x05, 0x01,          // Usage Page (Generic Desktop),
 	0x09, 0x06,          // Usage (Keyboard),
 	0xa1, 0x01,          // Collection (Application),
+
 	0x75, 0x01,          //   Report Size (1),
 	0x95, 0x08,          //   Report Count (8),
 	0x05, 0x07,          //   Usage Page (Key Codes),
@@ -118,18 +122,11 @@ PROGMEM static const uint8_t keyboard_hid_report_desc[] = {
 	0x15, 0x00,          //   Logical Minimum (0),
 	0x25, 0x01,          //   Logical Maximum (1),
 	0x81, 0x02,          //   Input (Data, Variable, Absolute), ;Modifier byte
+
 	0x95, 0x01,          //   Report Count (1),
 	0x75, 0x08,          //   Report Size (8),
 	0x81, 0x03,          //   Input (Constant),                 ;Reserved byte
-	0x95, 0x05,          //   Report Count (5),
-	0x75, 0x01,          //   Report Size (1),
-	0x05, 0x08,          //   Usage Page (LEDs),
-	0x19, 0x01,          //   Usage Minimum (1),
-	0x29, 0x05,          //   Usage Maximum (5),
-	0x91, 0x02,          //   Output (Data, Variable, Absolute), ;LED report
-	0x95, 0x01,          //   Report Count (1),
-	0x75, 0x03,          //   Report Size (3),
-	0x91, 0x03,          //   Output (Constant),                 ;LED report padding
+
 	0x95, 0x06,          //   Report Count (6),
 	0x75, 0x08,          //   Report Size (8),
 	0x15, 0x00,          //   Logical Minimum (0),
@@ -138,110 +135,125 @@ PROGMEM static const uint8_t keyboard_hid_report_desc[] = {
 	0x19, 0x00,          //   Usage Minimum (0),
 	0x29, 0xdf,          //   Usage Maximum (223),
 	0x81, 0x00,          //   Input (Data, Array),
+
+	0x95, 0x05,          //   Report Count (5),
+	0x75, 0x01,          //   Report Size (1),
+	0x05, 0x08,          //   Usage Page (LEDs),
+	0x19, 0x01,          //   Usage Minimum (1),
+	0x29, 0x05,          //   Usage Maximum (5),
+	0x91, 0x02,          //   Output (Data, Variable, Absolute), ;LED report
+
+	0x95, 0x01,          //   Report Count (1),
+	0x75, 0x03,          //   Report Size (3),
+	0x91, 0x03,          //   Output (Constant),                 ;LED report padding
+
 	0xc0                 // End Collection
 };
 
 PROGMEM static const uint8_t mouse_hid_report_desc[] = {   /* USB report descriptor */
-	0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
-	0x09, 0x02,                    // USAGE (Mouse)
-	0xa1, 0x01,                    // COLLECTION (Application)
-	0x09, 0x01,                    //   USAGE (Pointer)
-	0xa1, 0x00,                    //   COLLECTION (Physical)
-	0x05, 0x09,                    //     USAGE_PAGE (Button)
-	0x19, 0x01,                    //     USAGE_MINIMUM (1)
-	0x29, 0x05,                    //     USAGE_MAXIMUM (5)
-	0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
-	0x25, 0x01,                    //     LOGICAL_MAXIMUM (1)
-	0x75, 0x01,                    //     REPORT_SIZE (1)
-	0x95, 0x05,                    //     REPORT_COUNT (5)
-	0x81, 0x02,                    //     INPUT (Data,Var,Abs)
-	0x75, 0x03,                    //     REPORT_SIZE (3)
-	0x95, 0x01,                    //     REPORT_COUNT (1)
-	0x81, 0x03,                    //     INPUT (Const,Var,Abs)
-	0x05, 0x01,                    //     USAGE_PAGE (Generic Desktop)
-	0x09, 0x30,                    //     USAGE (X)
-	0x09, 0x31,                    //     USAGE (Y)
-	0x09, 0x38,                    //     USAGE (Wheel)
-	0x15, 0x81,                    //     LOGICAL_MINIMUM (-127)
-	0x25, 0x7f,                    //     LOGICAL_MAXIMUM (127)
-	0x75, 0x08,                    //     REPORT_SIZE (8)
-	0x95, 0x03,                    //     REPORT_COUNT (3)
-	0x81, 0x06,                    //     INPUT (Data,Var,Rel)
-	0xc0,                          //   END_COLLECTION
-	0xc0,                          // END COLLECTION
+	0x05, 0x01,          // Usage Page (Generic Desktop)
+	0x09, 0x02,          // Usage (Mouse)
+	0xa1, 0x01,          // Collection (Application)
+	0x09, 0x01,          //   Usage (Pointer)
+	0xa1, 0x00,          //   Collection (Physical)
+
+	0x05, 0x09,          //     Usage Page (Button)
+	0x19, 0x01,          //     Usage Minimum (1)
+	0x29, 0x05,          //     Usage Maximum (5)
+	0x15, 0x00,          //     Logical Minimum (0)
+	0x25, 0x01,          //     Logical Maximum (1)
+	0x75, 0x01,          //     Report Size (1)
+	0x95, 0x05,          //     Report Count (5)
+	0x81, 0x02,          //     Input (Data,Var,Abs)
+
+	0x75, 0x03,          //     Report Size (3)
+	0x95, 0x01,          //     Report Count (1)
+	0x81, 0x03,          //     Input (Const,Var,Abs)
+	0x05, 0x01,          //     Usage Page (Generic Desktop)
+	0x09, 0x30,          //     Usage (X)
+	0x09, 0x31,          //     Usage (Y)
+	0x09, 0x38,          //     Usage (Wheel)
+	0x15, 0x81,          //     Logical Minimum (-127)
+	0x25, 0x7f,          //     Logical Maximum (127)
+	0x75, 0x08,          //     Report Size (8)
+	0x95, 0x03,          //     Report Count (3)
+	0x81, 0x06,          //     Input (Data,Var,Rel)
+
+	0xc0,                //   End Collection
+	0xc0,                // End Collection
 };
 
 #define KEYBOARD_HID_DESC_OFFSET (9+9)
 #define MOUSE_HID_DESC_OFFSET    (9+9+9+7+9)
 PROGMEM const uint8_t config_desc[] = {    /* USB configuration descriptor */
-	9,          /* sizeof(usbDescriptorConfiguration): length of descriptor in bytes */
-	2 /*USBDESCR_CONFIG*/,    /* descriptor type */
-	9+9+9+7+9+9+7, 0, /* total length of data returned (including inlined descriptors) */
-	2,          /* number of interfaces in this configuration */
-	1,          /* index of this configuration */
-	0,          /* configuration name string index */
+	9, // sizeof(usbDescriptorConfiguration): length of descriptor in bytes
+	2, // descriptor type
+	9+9+9+7+9+9+7, 0, // total length of data returned (including inlined descriptors)
+	2, // number of interfaces in this configuration
+	1, // index of this configuration
+	0, // configuration name string index
 #if USB_CFG_IS_SELF_POWERED
-	(1 << 7) | USBATTR_SELFPOWER,       /* attributes */
+	(1 << 7) | USBATTR_SELFPOWER, // attributes
 #else
-	(1 << 7),                           /* attributes */
+	(1 << 7), // attributes
 #endif
-	100 /*USB_CFG_MAX_BUS_POWER*/ / 2,            /* max USB current in 2mA units */
+	100 / 2, // max USB current in 2mA units
 
 	//// interface: keyboard
 
-	/* interface descriptor follows inline: */
-	9,          /* sizeof(usbDescrInterface): length of descriptor in bytes */
-	4 /*USBDESCR_INTERFACE*/, /* descriptor type */
-	KEYBOARD_INTERFACE /*USBIFACE_INDEX_KEYBOARD*/,          /* index of this interface */
-	0,          /* alternate setting for this interface */
-	1,//USB_CFG_HAVE_INTRIN_ENDPOINT + USB_CFG_HAVE_INTRIN_ENDPOINT3, /* endpoints excl 0: number of endpoint descriptors to follow */
-	3 /*USB_CFG_INTERFACE_CLASS*/,
-	0 /*USB_CFG_INTERFACE_SUBCLASS*/,
-	1 /*USBIFACE_PROTOCOL_KEYBOARD*/, //USB_CFG_INTERFACE_PROTOCOL,
-	0,          /* string index for interface */
+	// interface descriptor follows inline:
+	9, // sizeof(usbDescrInterface): length of descriptor in bytes
+	4, // descriptor type
+	KEYBOARD_INTERFACE, // index of this interface
+	0, // alternate setting for this interface
+	1, // endpoints excl 0: number of endpoint descriptors to follow
+	3,
+	0,
+	1,
+	0, // string index for interface
 
-	9,          /* sizeof(usbDescrHID): length of descriptor in bytes */
-	0x21 /*USBDESCR_HID*/,   /* descriptor type: HID */
-	0x01, 0x01, /* BCD representation of HID version */
-	0x00,       /* target country code */
-	0x01,       /* number of HID Report (or other HID class) Descriptor infos to follow */
-	0x22,       /* descriptor type: report */
-	sizeof(keyboard_hid_report_desc)/*USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH*/, 0,  /* total length of report descriptor */
+	9, // sizeof(usbDescrHID): length of descriptor in bytes
+	0x21, // descriptor type: HID
+	0x01, 0x01, // BCD representation of HID version
+	0x00, // target country code
+	0x01, // number of HID Report (or other HID class) Descriptor infos to follow
+	0x22, // descriptor type: report
+	sizeof(keyboard_hid_report_desc), 0, // total length of report descriptor
 
-	7,          /* sizeof(usbDescrEndpoint) */
-	5 /*USBDESCR_ENDPOINT*/,  /* descriptor type = endpoint */
-	KEYBOARD_ENDPOINT | 0x80, /* IN endpoint number 1 */
-	0x03,       /* attrib: Interrupt endpoint */
-	8, 0,       /* maximum packet size */
-	10 /*USB_CFG_INTR_POLL_INTERVAL*/, /* in ms */
+	7, // sizeof(usbDescrEndpoint)
+	5, // descriptor type = endpoint
+	KEYBOARD_ENDPOINT | 0x80, // IN endpoint
+	0x03, // attrib: Interrupt endpoint
+	8, 0, // maximum packet size
+	10, // in ms
 
 	//// interface: mouse
 
-	/* interface descriptor follows inline: */
-	9,          /* sizeof(usbDescrInterface): length of descriptor in bytes */
-	4 /*USBDESCR_INTERFACE*/, /* descriptor type */
-	MOUSE_INTERFACE /*USBIFACE_INDEX_MOUSE*/,          /* index of this interface */
-	0,          /* alternate setting for this interface */
-	1,//USB_CFG_HAVE_INTRIN_ENDPOINT + USB_CFG_HAVE_INTRIN_ENDPOINT3, /* endpoints excl 0: number of endpoint descriptors to follow */
-	3 /*USB_CFG_INTERFACE_CLASS*/,
-	0 /*USB_CFG_INTERFACE_SUBCLASS*/,
-	2 /*USBIFACE_PROTOCOL_MOUSE*/,//USB_CFG_INTERFACE_PROTOCOL,
-	0,          /* string index for interface */
+	// interface descriptor follows inline:
+	9, // sizeof(usbDescrInterface): length of descriptor in bytes
+	4, // descriptor type
+	MOUSE_INTERFACE, // index of this interface
+	0, // alternate setting for this interface
+	1, // endpoints excl 0: number of endpoint descriptors to follow
+	3,
+	0,
+	2,
+	0, // string index for interface
 
-	9,          /* sizeof(usbDescrHID): length of descriptor in bytes */
-	0x21 /*USBDESCR_HID*/,   /* descriptor type: HID */
-	0x01, 0x01, /* BCD representation of HID version */
-	0x00,       /* target country code */
-	0x01,       /* number of HID Report (or other HID class) Descriptor infos to follow */
-	0x22,       /* descriptor type: report */
-	sizeof(mouse_hid_report_desc)/*USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH*/, 0,  /* total length of report descriptor */
+	9, // sizeof(usbDescrHID): length of descriptor in bytes
+	0x21, // descriptor type: HID
+	0x01, 0x01, // BCD representation of HID version
+	0x00, // target country code
+	0x01, // number of HID Report (or other HID class) Descriptor infos to follow
+	0x22, // descriptor type: report
+	sizeof(mouse_hid_report_desc), 0, // total length of report descriptor
 
-	7,          /* sizeof(usbDescrEndpoint) */
-	5 /*USBDESCR_ENDPOINT*/,  /* descriptor type = endpoint */
-	MOUSE_ENDPOINT | 0x80 /*USB_CFG_EP3_NUMBER*/, /* IN endpoint number 3 */
-	0x03,       /* attrib: Interrupt endpoint */
-	8, 0,       /* maximum packet size */
-	10 /*USB_CFG_INTR_POLL_INTERVAL*/, /* in ms */
+	7, // sizeof(usbDescrEndpoint)
+	5, // descriptor type = endpoint
+	MOUSE_ENDPOINT | 0x80, // IN endpoint
+	0x03, // attrib: Interrupt endpoint
+	8, 0, // maximum packet size
+	10, // in ms
 };
 
 // If you're desperate for a little extra code memory, these strings
@@ -330,11 +342,11 @@ void usb_init()
 	HW_CONFIG();
 	USB_FREEZE();				// enable USB
 	PLL_CONFIG();				// config PLL
-	while (!(PLLCSR & (1<<PLOCK))) ;	// wait for PLL lock
+	while (!(PLLCSR & (1 << PLOCK))) ;	// wait for PLL lock
 	USB_CONFIG();				// start USB clock
 	UDCON = 0;				// enable attach resistor
 	usb_configuration = 0;
-	UDIEN = (1<<EORSTE) | (1<<SOFE);
+	UDIEN = (1 << EORSTE) | (1 << SOFE);
 	sei();
 }
 
@@ -505,7 +517,7 @@ void usb_com_vect()
 			if (rtype == 0) {
 				usb_configuration = value;
 				usb_send_in();
-				for (uint8_t i = 1; i < 5; i++) {
+				for (uint8_t i = 1; i <= MAX_ENDPOINT; i++) {
 					UENUM = i;
 					UECONX = 0;
 				}

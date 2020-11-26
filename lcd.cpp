@@ -46,7 +46,7 @@ private:
 		i2c_dat.write(true);
 	}
 
-	int i2c_get_da()
+	uint8_t i2c_get_da()
 	{
 		return i2c_dat.read();
 	}
@@ -81,15 +81,14 @@ private:
 	}
 
 	// 1バイト送信
-	bool i2c_write(int c)
+	bool i2c_write(uint8_t c)
 	{
-		int i;
 		bool nack;
 
 		delay();
 
 		// 8ビット送信
-		for (i = 0; i < 8; i++) {
+		for (uint8_t i = 0; i < 8; i++) {
 			if (c & 0x80) {
 				i2c_da_1(); // SCL=1
 			} else {
@@ -115,21 +114,29 @@ private:
 		return nack;
 	}
 
-	int address; // I2Cデバイスアドレス
+	uint8_t address; // I2Cデバイスアドレス
 
 public:
-	I2C(int address)
+	I2C(uint8_t address)
 		: address(address)
 	{
 		init_i2c();
 	}
 
 	// デバイスのレジスタに書き込む
-	virtual void write(int data)
+	void write(uint8_t reg, uint8_t data)
 	{
 		i2c_start();                   // スタート
 		i2c_write(address << 1);       // デバイスアドレスを送信
-//		i2c_write(reg);                // レジスタ番号を送信
+		i2c_write(reg);                // レジスタ番号を送信
+		i2c_write(data);               // データを送信
+		i2c_stop();                    // ストップ
+	}
+
+	void write(uint8_t data)
+	{
+		i2c_start();                   // スタート
+		i2c_write(address << 1);       // デバイスアドレスを送信
 		i2c_write(data);               // データを送信
 		i2c_stop();                    // ストップ
 	}
@@ -196,18 +203,5 @@ void lcd::init()
 	lcd_byte(0x28, LCD_CMD);
 	usleep(40);
 	clear();
-}
-
-void lcd::puthex8(uint8_t v)
-{
-	static char hex[] = "0123456789ABCDEF";
-	putchar(hex[(v >> 4) & 0x0f]);
-	putchar(hex[v & 0x0f]);
-}
-
-void lcd::puthex16(uint16_t v)
-{
-	puthex8((v >> 8) & 0xff);
-	puthex8(v & 0xff);
 }
 

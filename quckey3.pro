@@ -1,6 +1,8 @@
 
 INCLUDEPATH += /usr/lib/avr/include
 
+DEFINES += __AVR_ATmega32U2__
+
 HEADERS += \
     usb.h \
     ps2.h \

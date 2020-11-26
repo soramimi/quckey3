@@ -1,5 +1,6 @@
 
 #include "waitloop.h"
+#include <stdint.h>
 
 void waitloop(unsigned int n)
 {
@@ -29,15 +30,14 @@ void msleep(unsigned int ms)
 
 void wait_100ms()
 {
-	for (int i = 0; i < 100; i++) {
+	for (uint8_t i = 0; i < 100; i++) {
 		wait_1ms();
 	}
 }
 
 void wait_1s()
 {
-	int i;
-	for (i = 0; i < 1000; i++) {
+	for (unsigned int i = 0; i < 1000; i++) {
 		wait_1ms();
 	}
 }

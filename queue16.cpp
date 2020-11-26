@@ -1,7 +1,6 @@
 
 #include "queue16.h"
 
-
 void q16init(struct Queue16 *q)
 {
 	q->pos = 0;
@@ -23,7 +22,7 @@ int q16get(struct Queue16 *q)
 	return c;
 }
 
-void q16put(struct Queue16 *q, unsigned char c)
+void q16put(struct Queue16 *q, uint8_t c)
 {
 	if (q->len < sizeof(q->buf)) {
 		q->buf[(q->pos + q->len) % sizeof(q->buf)] = c;
@@ -31,7 +30,7 @@ void q16put(struct Queue16 *q, unsigned char c)
 	}
 }
 
-void q16unget(struct Queue16 *q, unsigned char c)
+void q16unget(struct Queue16 *q, uint8_t c)
 {
 	if (q->len < sizeof(q->buf)) {
 		q->pos = (q->pos + sizeof(q->buf) - 1) % sizeof(q->buf);

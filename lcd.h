@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+
 class lcd {
 public:
 	static void home();
@@ -10,8 +12,19 @@ public:
 	static void print(char const *ptr);
 	static void clear();
 	static void init();
-	static void puthex8(uint8_t c);
-	static void puthex16(uint16_t v);
 };
+
+extern "C" {
+
+#endif
+
+void lcd_home();
+void lcd_putchar(uint8_t c);
+void lcd_print(char const *p);
+void lcd_puthex8(uint8_t v);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // LCD_H

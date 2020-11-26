@@ -46,8 +46,8 @@ static uint8_t looup_prefix_0E(uint8_t c)
 		0x7e, 126,
 		0x7d, 85,
 	};
-	const int N = sizeof(table) / sizeof(*table);
-	for (int i = 0; i < N; i++) {
+	const uint8_t N = sizeof(table) / sizeof(*table);
+	for (uint8_t i = 0; i < N; i++) {
 		if (c == pgm_read_byte(&table[i].from)) {
 			return pgm_read_byte(&table[i].to);
 		}

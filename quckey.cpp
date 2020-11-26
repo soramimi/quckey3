@@ -17,10 +17,10 @@ typedef struct Queue16 Queue;
 #define qput(Q,C) q16put(Q,C)
 #define qunget(Q,C) q16unget(Q,C)
 
-extern void led(int f);
+extern void led(uint8_t f);
 extern void press_key(uint8_t key);
 extern void release_key(uint8_t key);
-void change_mouse(int dx, int dy, int dz, int buttons);
+void change_mouse(int dx, int dy, int dz, uint8_t buttons);
 extern volatile uint8_t keyboard_leds;
 
 uint8_t interval_1ms_flag = 0; // 1ms interval event
@@ -178,12 +178,6 @@ struct PS2Device {
 	uint8_t decode_state = 0;
 	uint8_t indicator = 0;
 
-	uint16_t typematic;
-	int typematic_rate;  // ms
-	int typematic_delay; // ms
-
-	uint16_t repeat_count;
-	uint16_t repeat_event;
 	uint16_t _device_id;
 	bool break_enable;
 	bool scan_enable;
@@ -192,9 +186,9 @@ struct PS2Device {
 PS2Device ps2k0;
 PS2Device ps2k1;
 
-int countbits(uint16_t c)
+uint8_t countbits(uint16_t c)
 {
-	int i;
+	uint8_t i;
 	for (i = 0; c; c >>= 1) {
 		if (c & 1) i++;
 	}
@@ -280,10 +274,7 @@ void intr(PS2Device *dev)
 	if (dev->io->get_clock()) {
 		sei();
 	} else {
-		int c;
-
 		dev->timeout = 10;	// 10ms
-
 		if (!dev->input_bits) {
 			if (dev->output_bits) {			// transmit mode
 				if (dev->output_bits == 1) {
@@ -309,7 +300,7 @@ void intr(PS2Device *dev)
 			if (dev->input_bits & 1) {
 				if (dev->input_bits & 0x800) {				// stop bit ?
 					if (countbits(dev->input_bits & 0x7fc) & 1) {	// odd parity ?
-						c = (dev->input_bits >> 2) & 0xff;
+						uint8_t c = (dev->input_bits >> 2) & 0xff;
 						qput(&dev->input_queue, c);
 					}
 				}
@@ -334,33 +325,14 @@ ISR(INT5_vect)
 
 void ps2_io_handler(PS2Device *dev)
 {
-	int c;
-
 	// transmit to keyboard
-	c = qget(&dev->output_queue);
+	int c = qget(&dev->output_queue);
 	if (c >= 0) {
 		if (!kb_next_output(dev, c)) {
 			qunget(&dev->output_queue, c);
 		}
 	}
 }
-
-
-
-
-#if 0
-enum {
-	PC_INIT			= 0x0000,
-	PC_NORMAL		= 0x0100,
-	PC_ED			= 0x0200,
-	PC_F0			= 0x0300,
-	PC_F3			= 0x0400,
-	PC_FB			= 0x0500,
-	PC_FC			= 0x0600,
-	PC_FD			= 0x0700,
-	PC_FF			= 0x0800,
-};
-#endif
 
 enum {
 	PS2_INIT          = 0x0000,
@@ -379,57 +351,6 @@ enum {
 	EVENT_SEND_KB_INDICATOR		= 0x0400,
 };
 
-
-
-
-
-
-#if 0
-
-void change_typematic(uint8_t v)
-{
-	typematic = v;
-	typematic_rate = 13;
-	typematic_delay = 200;
-}
-
-#else
-
-void change_typematic(PS2Device *kb, uint8_t v)
-{
-	kb->typematic = v;
-
-	v = kb->typematic & 0x1f;
-	if (v < 0x1a) {
-		kb->typematic_rate = v * v * 2 + 12;
-		v = (kb->typematic >> 5) & 3;
-		kb->typematic_delay = (v + 1) * 200;
-	} else {
-		kb->typematic_rate = 0;
-		kb->typematic_delay = 0;
-	}
-}
-
-#endif
-
-int get_typematic_rate(PS2Device *kb)
-{
-	return kb->typematic_rate;
-}
-
-int get_typematic_delay(PS2Device *kb)
-{
-	return kb->typematic_delay;
-}
-
-
-#if 0
-static void _send_pc(uint8_t c, void *cookie)
-{
-	pc_put(c);
-}
-#endif
-
 void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 {
 	int c;
@@ -440,21 +361,6 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			k->reset_timer--;
 			if (k->reset_timer == 0) {
 				put_event(k, EVENT_INIT);
-			}
-		}
-		if (k->repeat_count > 0) {
-			k->repeat_count--;
-			if (k->repeat_count == 0) {
-				if (k->repeat_event != 0) {
-					put_event(k, k->repeat_event);
-					k->repeat_count = k->typematic_rate;
-				}
-			}
-		}
-		if (k->repeat_timeout > 0) {
-			k->repeat_timeout--;
-			if (k->repeat_timeout == 0) {
-				k->repeat_count = 0;
 			}
 		}
 		if (k->receive_timeout > 0) {
@@ -664,7 +570,6 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 				}
 				k->state = PS2_WAIT;
 				break;
-
 			case PS2_ED:
 				if (c == 0xfa) {
 					kb_put(k, k->indicator);
@@ -674,7 +579,6 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 					k->state = PS2_NORMAL;
 				}
 				break;
-
 			case PS2_WAIT:
 				k->reset_timer = 0;
 				k->scan_enable = true;
@@ -690,7 +594,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			}
 			if (k->real_device_id == 0) { // mouse
 				k->receive_timeout = 10;
-				int len = 3;
+				uint8_t len = 3;
 				if (k->mouse_device_type == IntelliMouseExplorer) {
 					len = 4;
 				}
@@ -708,7 +612,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 							int dy = k->mouse_buffer[2];
 							if (flags & 0x10) dx |= -1 << 8;
 							if (flags & 0x20) dy |= -1 << 8;
-							int buttons = 0;
+							uint8_t buttons = 0;
 							if (k->mouse_device_type != TrackManMarbleFX) {
 								k->mouse_buttons = flags & 0x07;
 								if (k->mouse_buttons & 0x01) buttons |= 0x01; // left
@@ -850,29 +754,9 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 							if (k->break_enable) {
 								put_event(k, event);
 							}
-							if ((event & 0xff) == (k->repeat_event & 0xff)) {
-								k->repeat_event = 0;
-								k->repeat_count = 0;
-								k->repeat_timeout = 0;
-							}
 						} else {
 							event = (t & 0xff) | EVENT_KEYMAKE;
-							if (event == k->repeat_event) {
-								if (k->repeat_count) {
-									k->repeat_timeout = 600;
-								}
-							} else {
-								put_event(k, event);
-								k->repeat_event = event;
-								k->repeat_timeout = 1200;
-								k->repeat_count = k->typematic_delay;
-
-								switch (event & 0xff) {
-								case 126:
-									k->repeat_count = 0;	// inhibit repeat
-									break;
-								}
-							}
+							put_event(k, event);
 						}
 					}
 					break;
@@ -881,10 +765,6 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 		}
 	}
 }
-
-
-
-
 
 void init_device(PS2Device *dev)
 {
@@ -910,7 +790,6 @@ void init_keyboard(PS2Device *k)
 
 	k->decode_state = 0;
 	k->indicator = 0;
-	change_typematic(k, 0x23);
 	k->real_device_id = 0x83ab;
 	k->fake_device_id = 0x83ab;
 	k->break_enable = true;
