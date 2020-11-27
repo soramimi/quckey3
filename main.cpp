@@ -1,3 +1,6 @@
+
+// Quckey3 - Copyright (C) 2020 S.Fuchita (@soramimi_jp)
+
 /* USB Keyboard Firmware code for generic Teensy Keyboards
  * Copyright (c) 2012 Fredrik Atmer, Bathroom Epiphanies Inc
  * http://bathroomepiphanies.com
@@ -21,8 +24,6 @@
  * THE SOFTWARE.
  */
 
-// Quckey3 - Copyright (C) 2020 S.Fuchita (@soramimi_jp)
-
 #include "lcd.h"
 #include "usb.h"
 #include <avr/interrupt.h>
@@ -35,8 +36,9 @@ static unsigned short _scale = 0;
 //static unsigned long _system_tick_count;
 //static unsigned long _tick_count;
 //static unsigned long _time_s;
-static unsigned short _time_ms;
-extern uint8_t interval_1ms_flag;
+static unsigned short _time_ms = 0;
+uint8_t interval_1ms_flag = 0;
+uint8_t mouse_send_timer = 0;
 ISR(TIMER0_OVF_vect, ISR_NOBLOCK)
 {
 //	_system_tick_count++;
@@ -50,6 +52,9 @@ ISR(TIMER0_OVF_vect, ISR_NOBLOCK)
 //			_time_s++;
 		}
 		interval_1ms_flag = 1;
+		if (mouse_send_timer > 0) {
+			mouse_send_timer--;
+		}
 	}
 }
 
@@ -61,8 +66,6 @@ extern "C" void led(uint8_t f)
 		PORTB &= ~0x01;
 	}
 }
-
-uint8_t keys[32]; // 256/8
 
 struct {
 	int dx = 0;
@@ -79,51 +82,39 @@ void change_mouse(int dx, int dy, int dz, uint8_t buttons)
 	mouse.buttons = buttons;
 }
 
-void send_keys()
+void release_key(uint8_t key)
 {
-	memset(keyboard_data, 0, 8);
-
-	auto Pressed = [&](uint8_t k){
-		return (keys[k >> 3] >> (k & 7)) & 1;
-	};
-
-	auto Push = [&](uint8_t k){
-		memmove(keyboard_data + 3, keyboard_data + 2, 5);
-		keyboard_data[2] = k;
-	};
-
-	uint8_t k = 0xdf;
-	while (k > 0) {
-		if (Pressed(k)) {
-			Push(k);
+	if (key > 0) {
+		if (key >= 0xe0 && key < 0xe8) {
+			keyboard_data[0] &= ~(1 << (key - 0xe0));
 		}
-		k--;
-	}
-
-	uint8_t mods = 0;
-	for (uint8_t i = 0; i < 8; i++) {
-		if (Pressed(0xe0 + i) & 1) {
-			mods |= 1 << i;
+		for (uint8_t i = 0; i < 6; i++) {
+			if (keyboard_data[i + 2] == key) {
+				if (i < 5) {
+					memmove(keyboard_data + 2 + i, keyboard_data + 3 + i, 5 - i);
+				}
+				keyboard_data[7] = 0;
+			}
 		}
 	}
-	keyboard_data[0] = mods;
-
+	keyboard_data[1] = 0;
 	usb_keyboard_send();
 }
 
 void press_key(uint8_t key)
 {
-	keys[key >> 3] |= 1 << (key & 7);
-	send_keys();
+	if (key >= 0xe0 && key < 0xe8) {
+		keyboard_data[0] |= 1 << (key - 0xe0);
+	} else if (key > 0) {
+		release_key(key);
+		memmove(keyboard_data + 3, keyboard_data + 2, 5);
+		keyboard_data[2] = key;
+	}
+	keyboard_data[1] = 0;
+	usb_keyboard_send();
 }
 
-void release_key(uint8_t key)
-{
-	keys[key >> 3] &= ~(1 << (key & 7));
-	send_keys();
-}
-
-static inline int clamp(int v, int min, int max)
+static int8_t clamp(int v, int8_t min, int8_t max)
 {
 	if (v > max) v = max;
 	if (v < min) v = min;
@@ -133,20 +124,29 @@ static inline int clamp(int v, int min, int max)
 void mouse_loop()
 {
 	static uint8_t last_buttons = 0;
-	uint8_t buttons = mouse.buttons;
-	int8_t dx = clamp(mouse.dx, -127, 127);
-	int8_t dy = clamp(mouse.dy, -127, 127);
-	int8_t dz = clamp(mouse.dz, -127, 127);
-	if (buttons != last_buttons || dx != 0 || dy != 0 || dz != 0) {
-		last_buttons = buttons;
-		mouse.dx -= dx;
-		mouse.dy -= dy;
-		mouse.dz -= dz;
-		mouse_data[0] = buttons;
-		mouse_data[1] = dx;
-		mouse_data[2] = dy;
-		mouse_data[3] = dz;
-		usb_mouse_send();
+	if (mouse_send_timer == 0) {
+		uint8_t buttons = mouse.buttons;
+		int8_t dx = clamp(mouse.dx, -127, 127);
+		int8_t dy = clamp(mouse.dy, -127, 127);
+		int8_t dz = clamp(mouse.dz, -127, 127);
+		if (buttons != last_buttons || dx != 0 || dy != 0 || dz != 0) {
+			last_buttons = buttons;
+#if 0
+			mouse.dx -= dx;
+			mouse.dy -= dy;
+			mouse.dz -= dz;
+#else
+			mouse.dx = 0;
+			mouse.dy = 0;
+			mouse.dz = 0;
+#endif
+			mouse_data[0] = buttons;
+			mouse_data[1] = dx;
+			mouse_data[2] = dy;
+			mouse_data[3] = dz;
+			usb_mouse_send();
+			mouse_send_timer = 2; // wait
+		}
 	}
 }
 

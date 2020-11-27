@@ -1,3 +1,6 @@
+
+// Quckey3 - Copyright (C) 2020 S.Fuchita (@soramimi_jp)
+
 /* USB Keyboard Plus Debug Channel Example for Teensy USB Development Board
  * http://www.pjrc.com/teensy/usb_keyboard.html
  * Copyright (c) 2009 PJRC.COM, LLC
@@ -24,8 +27,6 @@
 // Version 1.0: Initial Release
 // Version 1.1: Add support for Teensy 2.0
 // 2012-09-07: Added the bootload jump routine /Fredrik Atmer
-
-// 2020-11-26: Quckey3 firmware - Copyright (C) 2020 S.Fuchita (@soramimi_jp)
 
 #define USB_SERIAL_PRIVATE_INCLUDE
 #include "usb.h"
@@ -94,7 +95,7 @@ PROGMEM static const uint8_t endpoint_config_table[] = {
 PROGMEM static const uint8_t device_desc[] = {
 	18,                  // bLength
 	1,                   // bDescriptorType
-	0x00, 0x02,          // bcdUSB
+	0x10, 0x01,          // bcdUSB
 	0,                   // bDeviceClass
 	0,                   // bDeviceSubClass
 	0,                   // bDeviceProtocol
@@ -102,8 +103,8 @@ PROGMEM static const uint8_t device_desc[] = {
 	LSB(VENDOR_ID), MSB(VENDOR_ID),   // idVendor
 	LSB(PRODUCT_ID), MSB(PRODUCT_ID), // idProduct
 	0x00, 0x01,          // bcdDevice
-	1,                   // iManufacturer
-	2,                   // iProduct
+	0,                   // iManufacturer
+	0,                   // iProduct
 	0,                   // iSerialNumber
 	1                    // bNumConfigurations
 };
@@ -196,7 +197,7 @@ PROGMEM const uint8_t config_desc[] = {    /* USB configuration descriptor */
 #if USB_CFG_IS_SELF_POWERED
 	(1 << 7) | USBATTR_SELFPOWER, // attributes
 #else
-	(1 << 7), // attributes
+	(1 << 7) | (1 << 5), // bus powered | remote wakeup
 #endif
 	100 / 2, // max USB current in 2mA units
 
@@ -215,7 +216,7 @@ PROGMEM const uint8_t config_desc[] = {    /* USB configuration descriptor */
 
 	9, // sizeof(usbDescrHID): length of descriptor in bytes
 	0x21, // descriptor type: HID
-	0x01, 0x01, // BCD representation of HID version
+	0x10, 0x01, // BCD representation of HID version
 	0x00, // target country code
 	0x01, // number of HID Report (or other HID class) Descriptor infos to follow
 	0x22, // descriptor type: report
@@ -243,7 +244,7 @@ PROGMEM const uint8_t config_desc[] = {    /* USB configuration descriptor */
 
 	9, // sizeof(usbDescrHID): length of descriptor in bytes
 	0x21, // descriptor type: HID
-	0x01, 0x01, // BCD representation of HID version
+	0x10, 0x01, // BCD representation of HID version
 	0x00, // target country code
 	0x01, // number of HID Report (or other HID class) Descriptor infos to follow
 	0x22, // descriptor type: report

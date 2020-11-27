@@ -17,20 +17,20 @@ typedef struct Queue16 Queue;
 #define qput(Q,C) q16put(Q,C)
 #define qunget(Q,C) q16unget(Q,C)
 
-extern void led(uint8_t f);
-extern void press_key(uint8_t key);
-extern void release_key(uint8_t key);
+void led(uint8_t f);
+void press_key(uint8_t key);
+void release_key(uint8_t key);
 void change_mouse(int dx, int dy, int dz, uint8_t buttons);
 extern volatile uint8_t keyboard_leds;
 
-uint8_t interval_1ms_flag = 0; // 1ms interval event
+extern uint8_t interval_1ms_flag; // 1ms interval event
 
 enum MouseDeviceType {
 	Keyboard,
 	GenericMouse,
-	IntelliMouseExplorer_00000a,
-	IntelliMouseExplorer_10000a,
-	IntelliMouseExplorer,
+	IntelliMouse_00000a,
+	IntelliMouse_10000a,
+	IntelliMouse,
 	TrackManMarbleFX,
 };
 
@@ -85,7 +85,7 @@ PROGMEM static const uint16_t init_sequence_for_default_mouse[] = {
 	0
 };
 
-PROGMEM static const uint16_t init_sequence_for_intellimouseexplorer_mouse[] = {
+PROGMEM static const uint16_t init_sequence_for_intellimouse_mouse[] = {
 	SEND(0xe8), 0,              // set resolution
 	CHECK(0xfa), SEND(0), 0,
 	CHECK(0xfa), SEND(0xe7), 0, // set scaling 2:1
@@ -98,6 +98,12 @@ PROGMEM static const uint16_t init_sequence_for_intellimouseexplorer_mouse[] = {
 	STORE(2), EVENT(1),
 	SEND(0xe8), 0,              // set resolution
 	CHECK(0xfa), SEND(3), 0,
+	CHECK(0xfa), SEND(0xf3), 0, // set sample rate
+	CHECK(0xfa), SEND(200), 0,
+	CHECK(0xfa), SEND(0xf3), 0, // set sample rate
+	CHECK(0xfa), SEND(100), 0,
+	CHECK(0xfa), SEND(0xf3), 0, // set sample rate
+	CHECK(0xfa), SEND(80), 0,
 	CHECK(0xfa), SEND(0xf3), 0, // set sample rate
 	CHECK(0xfa), SEND(200), 0,
 	CHECK(0xfa), SEND(0xf3), 0, // set sample rate
@@ -354,7 +360,7 @@ enum {
 void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 {
 	int c;
-	long event;
+	uint16_t event;
 
 	if (timer_event_flag) {
 		if (k->reset_timer > 0) {
@@ -442,8 +448,8 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 				switch (t) {
 				case EVENT(0):
 					if (k->mouse_buffer[0] == 0x00 && k->mouse_buffer[1] == 0x00 && k->mouse_buffer[2] == 0x0a) {
-						k->mouse_device_type = IntelliMouseExplorer_00000a;
-						k->init_sequece = init_sequence_for_intellimouseexplorer_mouse;
+						k->mouse_device_type = IntelliMouse_00000a;
+						k->init_sequece = init_sequence_for_intellimouse_mouse;
 					} else if (k->mouse_buffer[0] == 0x19 && k->mouse_buffer[1] == 0x03 && k->mouse_buffer[2] == 0xc8) {
 						k->mouse_device_type = TrackManMarbleFX;
 						k->init_sequece = init_sequence_for_logitech_mouse;
@@ -453,15 +459,18 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 					break;
 				case EVENT(1):
 					if (k->mouse_buffer[0] == 0x10 && k->mouse_buffer[1] == 0x00 && k->mouse_buffer[2] == 0x0a) {
-						k->mouse_device_type = IntelliMouseExplorer_10000a;
+						k->mouse_device_type = IntelliMouse_10000a;
 						k->init_sequece++;
 					} else {
 						UseDefaultMouse();
 					}
 					break;
 				case EVENT(2):
-					if (k->mouse_buffer[0] == 0x04) {
-						k->mouse_device_type = IntelliMouseExplorer;
+					if (k->mouse_buffer[0] == 0x03) {
+						k->mouse_device_type = IntelliMouse;
+						k->init_sequece++;
+					} else if (k->mouse_buffer[0] == 0x04) {
+						k->mouse_device_type = IntelliMouse;
 						k->init_sequece++;
 					} else {
 						UseDefaultMouse();
@@ -595,7 +604,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			if (k->real_device_id == 0) { // mouse
 				k->receive_timeout = 10;
 				uint8_t len = 3;
-				if (k->mouse_device_type == IntelliMouseExplorer) {
+				if (k->mouse_device_type == IntelliMouse) {
 					len = 4;
 				}
 				if (k->mouse_received < len) {
@@ -618,7 +627,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 								if (k->mouse_buttons & 0x01) buttons |= 0x01; // left
 								if (k->mouse_buttons & 0x02) buttons |= 0x02; // right
 								if (k->mouse_buttons & 0x04) buttons |= 0x04; // middle
-								if (k->mouse_device_type == IntelliMouseExplorer) {
+								if (k->mouse_device_type == IntelliMouse) {
 									k->mouse_buttons |= (k->mouse_buffer[3] >> 1) & 0x18;
 									if (k->mouse_buttons & 0x08) buttons |= 0x08; // middle
 									if (k->mouse_buttons & 0x10) buttons |= 0x10; // middle
@@ -689,8 +698,8 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 							}
 
 							if (1) { // acceleration
-								int xx = dx * dx;
-								int yy = dy * dy;
+								long xx = (long)dx * dx;
+								long yy = (long)dy * dy;
 								if (xx + yy >= 9) {
 									if (xx + yy < 300) {
 										if (xx > yy) {
