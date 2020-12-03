@@ -82,7 +82,7 @@ void change_mouse(int dx, int dy, int dz, uint8_t buttons)
 	mouse.buttons = buttons;
 }
 
-void release_key(uint8_t key)
+void clear_key(uint8_t key)
 {
 	if (key > 0) {
 		if (key >= 0xe0 && key < 0xe8) {
@@ -97,6 +97,11 @@ void release_key(uint8_t key)
 			}
 		}
 	}
+}
+
+void release_key(uint8_t key)
+{
+	clear_key(key);
 	keyboard_data[1] = 0;
 	usb_keyboard_send();
 }
@@ -106,7 +111,7 @@ void press_key(uint8_t key)
 	if (key >= 0xe0 && key < 0xe8) {
 		keyboard_data[0] |= 1 << (key - 0xe0);
 	} else if (key > 0) {
-		release_key(key);
+		clear_key(key);
 		memmove(keyboard_data + 3, keyboard_data + 2, 5);
 		keyboard_data[2] = key;
 	}

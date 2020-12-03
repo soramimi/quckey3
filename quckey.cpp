@@ -153,9 +153,6 @@ PROGMEM static const uint16_t init_sequence_for_logitech_mouse[] = {
 	0
 };
 
-PS2KB0 ps2kb0io;
-PS2KB1 ps2kb1io;
-
 struct PS2Device {
 	AbstractPS2IO *io;
 	uint16_t input_bits;
@@ -189,8 +186,14 @@ struct PS2Device {
 	bool scan_enable;
 };
 
+PS2KB0 ps2kb0io;
+PS2KB1 ps2kb1io;
+
 PS2Device ps2k0;
 PS2Device ps2k1;
+
+uint8_t release_key_code = 0;
+uint8_t key_release_time = 0;
 
 uint8_t countbits(uint16_t c)
 {
@@ -357,6 +360,23 @@ enum {
 	EVENT_SEND_KB_INDICATOR		= 0x0400,
 };
 
+void internal_press_key(uint8_t c)
+{
+	if (c < 0xe0) {
+		release_key_code = c;
+		key_release_time = 0;
+	}
+	press_key(c);
+}
+
+void internal_release_key(uint8_t c)
+{
+	if (c == release_key_code) {
+		key_release_time = 5;
+	} else {
+		release_key(c);
+	}
+}
 void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 {
 	int c;
@@ -413,12 +433,12 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 		case EVENT_KEYMAKE:
 			c = event & 0xff;
 			c = convert_scan_code_ibm_to_hid(c);
-			press_key(c);
+			internal_press_key(c);
 			break;
 		case EVENT_KEYBREAK:
 			c = event & 0xff;
 			c = convert_scan_code_ibm_to_hid(c);
-			release_key(c);
+			internal_release_key(c);
 			break;
 		case EVENT_SEND_KB_INDICATOR:
 			if (k->state != PS2_NORMAL) {
@@ -839,6 +859,15 @@ void keyboard_loop()
 
 	ps2_io_handler(&ps2k0);
 	ps2_io_handler(&ps2k1);
+
+	if (timerevent) {
+		if (key_release_time > 0) {
+			key_release_time--;
+			if (key_release_time == 0) {
+				release_key(release_key_code);
+			}
+		}
+	}
 }
 
 
