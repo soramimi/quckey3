@@ -847,7 +847,7 @@ void keyboard_setup()
 	init_keyboard(&ps2k1);
 }
 
-void keyboard_loop()
+void ps2_loop()
 {
 	cli();
 	bool timerevent = interval_1ms_flag;

@@ -38,7 +38,9 @@ static unsigned short _scale = 0;
 //static unsigned long _time_s;
 static unsigned short _time_ms = 0;
 uint8_t interval_1ms_flag = 0;
-uint8_t mouse_send_timer = 0;
+uint8_t usb_send_timer = 0;
+bool keyboard_send_flag = false;
+bool mouse_send_flag = false;
 ISR(TIMER0_OVF_vect, ISR_NOBLOCK)
 {
 //	_system_tick_count++;
@@ -52,8 +54,8 @@ ISR(TIMER0_OVF_vect, ISR_NOBLOCK)
 //			_time_s++;
 		}
 		interval_1ms_flag = 1;
-		if (mouse_send_timer > 0) {
-			mouse_send_timer--;
+		if (usb_send_timer > 0) {
+			usb_send_timer--;
 		}
 	}
 }
@@ -67,19 +69,22 @@ extern "C" void led(uint8_t f)
 	}
 }
 
-struct {
-	int dx = 0;
-	int dy = 0;
-	int dz = 0;
-	uint8_t buttons = 0;
-} mouse;
+static int8_t clamp(int v, int8_t min, int8_t max)
+{
+	if (v > max) v = max;
+	if (v < min) v = min;
+	return v;
+}
 
 void change_mouse(int dx, int dy, int dz, uint8_t buttons)
 {
-	mouse.dx += dx;
-	mouse.dy += dy;
-	mouse.dz += dz;
-	mouse.buttons = buttons;
+	if (buttons != mouse_data[0] || dx != 0 || dy != 0 || dz != 0) {
+		mouse_data[0] = buttons;
+		mouse_data[1] = clamp(dx, -127, 127);
+		mouse_data[2] = clamp(dy, -127, 127);
+		mouse_data[3] = clamp(dz, -127, 127);
+		mouse_send_flag = true;
+	}
 }
 
 void clear_key(uint8_t key)
@@ -88,10 +93,12 @@ void clear_key(uint8_t key)
 		if (key >= 0xe0 && key < 0xe8) {
 			keyboard_data[0] &= ~(1 << (key - 0xe0));
 		}
-		for (uint8_t i = 0; i < 6; i++) {
-			if (keyboard_data[i + 2] == key) {
-				if (i < 5) {
-					memmove(keyboard_data + 2 + i, keyboard_data + 3 + i, 5 - i);
+		uint8_t i = 8;
+		while (i > 2) {
+			i--;
+			if (keyboard_data[i] == key) {
+				if (i < 7) {
+					memmove(keyboard_data + i, keyboard_data + i + 1, 7 - i);
 				}
 				keyboard_data[7] = 0;
 			}
@@ -103,7 +110,7 @@ void release_key(uint8_t key)
 {
 	clear_key(key);
 	keyboard_data[1] = 0;
-	usb_keyboard_send();
+	keyboard_send_flag = true;
 }
 
 void press_key(uint8_t key)
@@ -116,47 +123,26 @@ void press_key(uint8_t key)
 		keyboard_data[2] = key;
 	}
 	keyboard_data[1] = 0;
-	usb_keyboard_send();
+	keyboard_send_flag = true;
 }
 
-static int8_t clamp(int v, int8_t min, int8_t max)
+void send_loop()
 {
-	if (v > max) v = max;
-	if (v < min) v = min;
-	return v;
-}
-
-void mouse_loop()
-{
-	static uint8_t last_buttons = 0;
-	if (mouse_send_timer == 0) {
-		uint8_t buttons = mouse.buttons;
-		int8_t dx = clamp(mouse.dx, -127, 127);
-		int8_t dy = clamp(mouse.dy, -127, 127);
-		int8_t dz = clamp(mouse.dz, -127, 127);
-		if (buttons != last_buttons || dx != 0 || dy != 0 || dz != 0) {
-			last_buttons = buttons;
-#if 0
-			mouse.dx -= dx;
-			mouse.dy -= dy;
-			mouse.dz -= dz;
-#else
-			mouse.dx = 0;
-			mouse.dy = 0;
-			mouse.dz = 0;
-#endif
-			mouse_data[0] = buttons;
-			mouse_data[1] = dx;
-			mouse_data[2] = dy;
-			mouse_data[3] = dz;
+	if (usb_send_timer == 0) {
+		if (keyboard_send_flag) {
+			usb_keyboard_send();
+			keyboard_send_flag = false;
+			usb_send_timer = 3; // wait
+		} else if (mouse_send_flag) {
 			usb_mouse_send();
-			mouse_send_timer = 2; // wait
+			mouse_send_flag = false;
+			usb_send_timer = 3; // wait
 		}
 	}
 }
 
 void keyboard_setup();
-void keyboard_loop();
+void ps2_loop();
 
 enum {
 	LCD_NONE = 0,
@@ -240,8 +226,8 @@ void setup()
 
 void loop()
 {
-	keyboard_loop();
-	mouse_loop();
+	ps2_loop();
+	send_loop();
 }
 
 int main()
