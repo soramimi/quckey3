@@ -9,6 +9,7 @@ extern "C" {
 
 void usb_init();			// initialize everything
 uint8_t usb_configured();		// is the USB port configured
+void usb_remote_wakeup();
 
 int8_t usb_keyboard_send();
 int8_t usb_mouse_send();

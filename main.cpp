@@ -79,6 +79,7 @@ static int8_t clamp(int v, int8_t min, int8_t max)
 void change_mouse(int dx, int dy, int dz, uint8_t buttons)
 {
 	if (buttons != mouse_data[0] || dx != 0 || dy != 0 || dz != 0) {
+		usb_remote_wakeup();
 		mouse_data[0] = buttons;
 		mouse_data[1] = clamp(dx, -127, 127);
 		mouse_data[2] = clamp(dy, -127, 127);
@@ -115,6 +116,7 @@ void release_key(uint8_t key)
 
 void press_key(uint8_t key)
 {
+	usb_remote_wakeup();
 	if (key >= 0xe0 && key < 0xe8) {
 		keyboard_data[0] |= 1 << (key - 0xe0);
 	} else if (key > 0) {
@@ -219,7 +221,7 @@ void setup()
 	lcd::init();
 	lcd::clear();
 	lcd::home();
-	lcd_print("Quckey3");
+//	lcd_print("Quckey3");
 
 	led(1);
 }

@@ -359,6 +359,13 @@ uint8_t usb_configured()
 	return usb_configuration;
 }
 
+void usb_remote_wakeup()
+{
+	if (UDINT & (1 << SUSPI)) {
+		UDCON |= 1 << RMWKUP;
+	}
+}
+
 // send the contents of keyboard_keys and keyboard_modifier_keys
 int8_t usb_send(uint8_t ep, uint8_t const *ptr, int len)
 {
@@ -366,6 +373,7 @@ int8_t usb_send(uint8_t ep, uint8_t const *ptr, int len)
 
 	if (!usb_configuration) return -1;
 	intr_state = SREG;
+
 	cli();
 	UENUM = ep;
 	timeout = UDFNUML + 50;
