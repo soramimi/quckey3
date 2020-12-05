@@ -38,9 +38,6 @@ static unsigned short _scale = 0;
 //static unsigned long _time_s;
 static unsigned short _time_ms = 0;
 uint8_t interval_1ms_flag = 0;
-uint8_t usb_send_timer = 0;
-bool keyboard_send_flag = false;
-bool mouse_send_flag = false;
 ISR(TIMER0_OVF_vect, ISR_NOBLOCK)
 {
 //	_system_tick_count++;
@@ -54,9 +51,6 @@ ISR(TIMER0_OVF_vect, ISR_NOBLOCK)
 //			_time_s++;
 		}
 		interval_1ms_flag = 1;
-		if (usb_send_timer > 0) {
-			usb_send_timer--;
-		}
 	}
 }
 
@@ -84,7 +78,7 @@ void change_mouse(int dx, int dy, int dz, uint8_t buttons)
 		mouse_data[1] = clamp(dx, -127, 127);
 		mouse_data[2] = clamp(dy, -127, 127);
 		mouse_data[3] = clamp(dz, -127, 127);
-		mouse_send_flag = true;
+		usb_mouse_send();
 	}
 }
 
@@ -111,12 +105,11 @@ void release_key(uint8_t key)
 {
 	clear_key(key);
 	keyboard_data[1] = 0;
-	keyboard_send_flag = true;
+	usb_keyboard_send();
 }
 
 void press_key(uint8_t key)
 {
-	usb_remote_wakeup();
 	if (key >= 0xe0 && key < 0xe8) {
 		keyboard_data[0] |= 1 << (key - 0xe0);
 	} else if (key > 0) {
@@ -125,22 +118,7 @@ void press_key(uint8_t key)
 		keyboard_data[2] = key;
 	}
 	keyboard_data[1] = 0;
-	keyboard_send_flag = true;
-}
-
-void send_loop()
-{
-	if (usb_send_timer == 0) {
-		if (keyboard_send_flag) {
-			usb_keyboard_send();
-			keyboard_send_flag = false;
-			usb_send_timer = 3; // wait
-		} else if (mouse_send_flag) {
-			usb_mouse_send();
-			mouse_send_flag = false;
-			usb_send_timer = 3; // wait
-		}
-	}
+	usb_keyboard_send();
 }
 
 void keyboard_setup();
@@ -229,7 +207,6 @@ void setup()
 void loop()
 {
 	ps2_loop();
-	send_loop();
 }
 
 int main()

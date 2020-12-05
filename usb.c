@@ -374,6 +374,8 @@ int8_t usb_send(uint8_t ep, uint8_t const *ptr, int len)
 	if (!usb_configuration) return -1;
 	intr_state = SREG;
 
+	usb_remote_wakeup();
+
 	cli();
 	UENUM = ep;
 	timeout = UDFNUML + 50;
