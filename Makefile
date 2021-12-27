@@ -171,5 +171,5 @@ clean:
 .PHONY : build hex eep end clean
 
 write: avr_keyboard.hex
-	avrpi -w avr_keyboard.hex --avr-write-fuse-e f4 --avr-write-fuse-h d9 --avr-write-fuse-l 5e
+	ftavr -w avr_keyboard.hex --avr-write-fuse-e f4 --avr-write-fuse-h d9 --avr-write-fuse-l 5e
 

@@ -1,115 +1,61 @@
 
-// Quckey3 - Copyright (C) 2020 S.Fuchita (@soramimi_jp)
-
-/* USB Keyboard Plus Debug Channel Example for Teensy USB Development Board
- * http://www.pjrc.com/teensy/usb_keyboard.html
- * Copyright (c) 2009 PJRC.COM, LLC
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-
-// Version 1.0: Initial Release
-// Version 1.1: Add support for Teensy 2.0
-// 2012-09-07: Added the bootload jump routine /Fredrik Atmer
-
-#define USB_SERIAL_PRIVATE_INCLUDE
 #include "usb.h"
 #include <stddef.h>
-#include "lcd.h"
 
-void led(int f);
-void lcd_puthex8(uint8_t v);
-
-/**************************************************************************
- *
- *  Configurable Options
- *
- **************************************************************************/
-
-// You can change these to give your code its own name.
+#define VENDOR_ID        0x03eb
+#define PRODUCT_ID       0x201d
 #define STR_MANUFACTURER L"soramimi@soramimi.jp"
 #define STR_PRODUCT      L"Quckey3"
-
-
-// Mac OS-X and Linux automatically load the correct drivers.  On
-// Windows, even though the driver is supplied by Microsoft, an
-// INF file is needed to load the driver.  These numbers need to
-// match the INF file.
-#define VENDOR_ID		0x16c0
-#define PRODUCT_ID		0x0482
-
-/**************************************************************************
- *
- *  Endpoint Buffer Configuration
- *
- **************************************************************************/
+#define STR_SERIALNUMBER L"1"
 
 #define ENDPOINT0_SIZE		32
 
+#if KEYBOARD_ENABLED
 #define KEYBOARD_INTERFACE  0
 #define KEYBOARD_ENDPOINT   3
 #define KEYBOARD_SIZE       8
 #define KEYBOARD_BUFFER     EP_DOUBLE_BUFFER
+#endif
 
+#if MOUSE_ENABLED
 #define MOUSE_INTERFACE     1
 #define MOUSE_ENDPOINT      4
 #define MOUSE_SIZE          8
 #define MOUSE_BUFFER        EP_DOUBLE_BUFFER
+#endif
 
 PROGMEM static const uint8_t endpoint_config_table[] = {
+#if KEYBOARD_ENABLED
 	KEYBOARD_ENDPOINT, EP_TYPE_INTERRUPT_IN, EP_SIZE(KEYBOARD_SIZE) | KEYBOARD_BUFFER,
+#endif
+#if MOUSE_ENABLED
 	MOUSE_ENDPOINT,    EP_TYPE_INTERRUPT_IN, EP_SIZE(MOUSE_SIZE) | MOUSE_BUFFER,
+#endif
 	0
 };
 
-
-/**************************************************************************
- *
- *  Descriptor Data
- *
- **************************************************************************/
-
-// Descriptors are the data that your computer reads when it auto-detects
-// this USB device (called "enumeration" in USB lingo).  The most commonly
-// changed items are editable at the top of this file.  Changing things
-// in here should only be done by those who've read chapter 9 of the USB
-// spec and relevant portions of any USB class specifications!
-
+// device descriptor
 
 PROGMEM static const uint8_t device_desc[] = {
-	18,                  // bLength
-	1,                   // bDescriptorType
+	18,                  // size
+	1,                   // descriptor type
 	0x10, 0x01,          // bcdUSB
-	0,                   // bDeviceClass
-	0,                   // bDeviceSubClass
-	0,                   // bDeviceProtocol
-	ENDPOINT0_SIZE,      // bMaxPacketSize0
-	LSB(VENDOR_ID), MSB(VENDOR_ID),   // idVendor
-	LSB(PRODUCT_ID), MSB(PRODUCT_ID), // idProduct
+	0,                   // device class
+	0,                   // device subclass
+	0,                   // device protocol
+	ENDPOINT0_SIZE,      // max packet size for EP0
+	LSB(VENDOR_ID), MSB(VENDOR_ID),   // vendor ID
+	LSB(PRODUCT_ID), MSB(PRODUCT_ID), // product ID
 	0x00, 0x01,          // bcdDevice
-	0,                   // iManufacturer
-	0,                   // iProduct
-	0,                   // iSerialNumber
-	1                    // bNumConfigurations
+	1,                   // index of string descriptor for manufacturer
+	2,                   // index of string descriptor for product
+	3,                   // index of string descriptor for serial number
+	1                    // number of configurations
 };
 
-// Keyboard Protocol 1, HID 1.11 spec, Appendix B, page 59-60
+// report descriptors
+
+#if KEYBOARD_ENABLED
 PROGMEM static const uint8_t keyboard_hid_report_desc[] = {
 	0x05, 0x01,          // Usage Page (Generic Desktop),
 	0x09, 0x06,          // Usage (Keyboard),
@@ -150,7 +96,9 @@ PROGMEM static const uint8_t keyboard_hid_report_desc[] = {
 
 	0xc0                 // End Collection
 };
+#endif
 
+#if MOUSE_ENABLED
 PROGMEM static const uint8_t mouse_hid_report_desc[] = {   /* USB report descriptor */
 	0x05, 0x01,          // Usage Page (Generic Desktop)
 	0x09, 0x02,          // Usage (Mouse)
@@ -184,14 +132,31 @@ PROGMEM static const uint8_t mouse_hid_report_desc[] = {   /* USB report descrip
 	0xc0,                //   End Collection
 	0xc0,                // End Collection
 };
+#endif
 
-#define KEYBOARD_HID_DESC_OFFSET (9+9)
-#define MOUSE_HID_DESC_OFFSET    (9+9+9+7+9)
+// configuration descriptor
+
+#if KEYBOARD_ENABLED
+#define KEYBOARD_HID_DESC_OFFSET (9 + 9)
+#define KEYBOARD_HID_DESC_LENGTH (9 + 9 + 7)
+#else
+#define KEYBOARD_HID_DESC_LENGTH (0)
+#endif
+
+#if MOUSE_ENABLED
+#define MOUSE_HID_DESC_OFFSET (9 + KEYBOARD_HID_DESC_LENGTH + 9)
+#define MOUSE_HID_DESC_LENGTH (9 + 9 + 7)
+#else
+#define MOUSE_HID_DESC_LENGTH (0)
+#endif
+
+#define USB_CURRENT_mA 100
+
 PROGMEM const uint8_t config_desc[] = {    /* USB configuration descriptor */
 	9, // sizeof(usbDescriptorConfiguration): length of descriptor in bytes
 	2, // descriptor type
-	9+9+9+7+9+9+7, 0, // total length of data returned (including inlined descriptors)
-	2, // number of interfaces in this configuration
+	9 + KEYBOARD_HID_DESC_LENGTH + MOUSE_HID_DESC_LENGTH, 0, // total length of data returned (including inlined descriptors)
+	KEYBOARD_ENABLED + MOUSE_ENABLED, // number of interfaces in this configuration
 	1, // index of this configuration
 	0, // configuration name string index
 #if USB_CFG_IS_SELF_POWERED
@@ -199,8 +164,9 @@ PROGMEM const uint8_t config_desc[] = {    /* USB configuration descriptor */
 #else
 	(1 << 7) | (1 << 5), // bus powered | remote wakeup
 #endif
-	100 / 2, // max USB current in 2mA units
+	USB_CURRENT_mA / 2, // max USB current in 2mA units
 
+#if KEYBOARD_ENABLED
 	//// interface: keyboard
 
 	// interface descriptor follows inline:
@@ -209,9 +175,9 @@ PROGMEM const uint8_t config_desc[] = {    /* USB configuration descriptor */
 	KEYBOARD_INTERFACE, // index of this interface
 	0, // alternate setting for this interface
 	1, // endpoints excl 0: number of endpoint descriptors to follow
-	3,
-	1,
-	1,
+	3, // interface class
+	1, // interface subclass
+	1, // interface protocol
 	0, // string index for interface
 
 	9, // sizeof(usbDescrHID): length of descriptor in bytes
@@ -228,7 +194,9 @@ PROGMEM const uint8_t config_desc[] = {    /* USB configuration descriptor */
 	0x03, // attrib: Interrupt endpoint
 	8, 0, // maximum packet size
 	10, // in ms
+#endif
 
+#if MOUSE_ENABLED
 	//// interface: mouse
 
 	// interface descriptor follows inline:
@@ -237,9 +205,9 @@ PROGMEM const uint8_t config_desc[] = {    /* USB configuration descriptor */
 	MOUSE_INTERFACE, // index of this interface
 	0, // alternate setting for this interface
 	1, // endpoints excl 0: number of endpoint descriptors to follow
-	3,
-	1,
-	2,
+	3, // interface subclass
+	1, // interface subclass
+	2, // interface protocol
 	0, // string index for interface
 
 	9, // sizeof(usbDescrHID): length of descriptor in bytes
@@ -256,11 +224,11 @@ PROGMEM const uint8_t config_desc[] = {    /* USB configuration descriptor */
 	0x03, // attrib: Interrupt endpoint
 	8, 0, // maximum packet size
 	10, // in ms
+#endif
 };
 
-// If you're desperate for a little extra code memory, these strings
-// can be completely removed if iManufacturer, iProduct, iSerialNumber
-// in the device desciptor are changed to zeros.
+// strings
+
 struct usb_string_descriptor_struct {
 	uint8_t length;
 	uint8_t descriptor_type;
@@ -281,9 +249,14 @@ PROGMEM static const struct usb_string_descriptor_struct string2 = {
 	3,
 	STR_PRODUCT
 };
+PROGMEM static const struct usb_string_descriptor_struct string3 = {
+	sizeof(STR_SERIALNUMBER),
+	3,
+	STR_SERIALNUMBER
+};
 
-// This table defines which descriptor data is sent for each specific
-// request from the host (in wValue and wIndex).
+// descriptor list
+
 struct descriptor_list_struct {
 	uint16_t value;
 	uint16_t index;
@@ -293,52 +266,38 @@ struct descriptor_list_struct {
 PROGMEM static const struct descriptor_list_struct descriptor_list[] = {
 {0x0100, 0x0000, device_desc, sizeof(device_desc)},
 {0x0200, 0x0000, config_desc, sizeof(config_desc)},
+#if KEYBOARD_ENABLED
 {0x2200, KEYBOARD_INTERFACE, keyboard_hid_report_desc, sizeof(keyboard_hid_report_desc)},
 {0x2100, KEYBOARD_INTERFACE, config_desc+KEYBOARD_HID_DESC_OFFSET, 9},
+#endif
+#if MOUSE_ENABLED
 {0x2200, MOUSE_INTERFACE, mouse_hid_report_desc, sizeof(mouse_hid_report_desc)},
 {0x2100, MOUSE_INTERFACE, config_desc+MOUSE_HID_DESC_OFFSET, 9},
+#endif
 {0x0300, 0x0000, (uint8_t const *)&string0, 4},
 {0x0301, 0x0409, (uint8_t const *)&string1, sizeof(STR_MANUFACTURER)},
-{0x0302, 0x0409, (uint8_t const *)&string2, sizeof(STR_PRODUCT)}
+{0x0302, 0x0409, (uint8_t const *)&string2, sizeof(STR_PRODUCT)},
+{0x0303, 0x0409, (uint8_t const *)&string3, sizeof(STR_SERIALNUMBER)},
 };
 #define NUM_DESC_LIST (sizeof(descriptor_list)/sizeof(struct descriptor_list_struct))
 
 
-/**************************************************************************
- *
- *  Variables - these are the only non-stack RAM usage
- *
- **************************************************************************/
-
 // zero when we are not configured, non-zero when enumerated
 static volatile uint8_t usb_configuration = 0;
 
+#if KEYBOARD_ENABLED
 uint8_t keyboard_data[8];
-uint8_t mouse_data[4];
-
-// protocol setting from the host.  We use exactly the same report
-// either way, so this variable only stores the setting since we
-// are required to be able to report which setting is in use.
 static uint8_t keyboard_protocol = 1;
-static uint8_t mouse_protocol = 1;
-
-// the idle configuration, how often we send the report to the
-// host (ms * 4) even when it hasn't changed
 static uint8_t keyboard_idle_config = 125;
-static uint8_t mouse_idle_config = 125;
-
-// 1=num lock, 2=caps lock, 4=scroll lock, 8=compose, 16=kana
 volatile uint8_t keyboard_leds = 0;
+#endif
 
+#if MOUSE_ENABLED
+uint8_t mouse_data[4];
+static uint8_t mouse_protocol = 1;
+static uint8_t mouse_idle_config = 125;
+#endif
 
-/**************************************************************************
- *
- *  Public Functions - these are the API intended for the user
- *
- **************************************************************************/
-
-
-// initialize USB
 void usb_init()
 {
 	HW_CONFIG();
@@ -352,8 +311,6 @@ void usb_init()
 	sei();
 }
 
-// return 0 if the USB is not configured, or the configuration
-// number selected by the HOST
 uint8_t usb_configured()
 {
 	return usb_configuration;
@@ -366,7 +323,6 @@ void usb_remote_wakeup()
 	}
 }
 
-// send the contents of keyboard_keys and keyboard_modifier_keys
 int8_t usb_send(uint8_t ep, uint8_t const *ptr, int len)
 {
 	uint8_t i, intr_state, timeout;
@@ -400,30 +356,41 @@ int8_t usb_send(uint8_t ep, uint8_t const *ptr, int len)
 	return 0;
 }
 
+#if KEYBOARD_ENABLED
 int8_t usb_keyboard_send()
 {
 	return usb_send(KEYBOARD_ENDPOINT, keyboard_data, 8);
 }
+#endif
 
+#if MOUSE_ENABLED
 int8_t usb_mouse_send()
 {
 	return usb_send(MOUSE_ENDPOINT, mouse_data, 4);
 }
+#endif
 
+static inline void usb_wait_in_ready()
+{
+	while (!(UEINTX & (1 << TXINI))) ;
+}
 
+static inline void usb_send_in()
+{
+	UEINTX = ~(1 << TXINI);
+}
 
-/**************************************************************************
- *
- *  Private Functions - not intended for general user consumption....
- *
- **************************************************************************/
+static inline void usb_wait_receive_out()
+{
+	while (!(UEINTX & (1 << RXOUTI))) ;
+}
 
+static inline void usb_ack_out()
+{
+	UEINTX = ~(1 << RXOUTI);
+}
 
-
-// USB Device Interrupt - handle all device-level events
-// the transmit buffer flushing is triggered by the start of frame
-//
-void usb_gen_vect()
+ISR(USB_GEN_vect)
 {
 	uint8_t intbits;
 
@@ -438,38 +405,8 @@ void usb_gen_vect()
 		usb_configuration = 0;
 	}
 }
-ISR(USB_GEN_vect)
-{
-	usb_gen_vect();
-}
 
-
-
-// Misc functions to wait for ready and send/receive packets
-static inline void usb_wait_in_ready()
-{
-	while (!(UEINTX & (1 << TXINI))) ;
-}
-static inline void usb_send_in()
-{
-	UEINTX = ~(1 << TXINI);
-}
-static inline void usb_wait_receive_out()
-{
-	while (!(UEINTX & (1 << RXOUTI))) ;
-}
-static inline void usb_ack_out()
-{
-	UEINTX = ~(1 << RXOUTI);
-}
-
-
-
-// USB Endpoint interrupt - endpoint 0 is handled here.  The
-// other endpoints are manipulated by the user-callable
-// functions, and the start-of-frame interrupt.
-//
-void usb_com_vect()
+ISR(USB_COM_vect)
 {
 	UENUM = 0;
 	uint8_t intbits = UEINTX;
@@ -586,6 +523,7 @@ void usb_com_vect()
 				}
 			}
 		}
+#if KEYBOARD_ENABLED
 		if (index == KEYBOARD_INTERFACE) {
 			if (rtype == 0xa1) {
 				if (request == HID_GET_IDLE) {
@@ -621,6 +559,8 @@ void usb_com_vect()
 				}
 			}
 		}
+#endif
+#if MOUSE_ENABLED
 		if (index == MOUSE_INTERFACE) {
 			if (rtype == 0x21) {
 				if (request == HID_SET_IDLE) {
@@ -635,12 +575,8 @@ void usb_com_vect()
 				}
 			}
 		}
+#endif
 	}
 	UECONX = (1 << STALLRQ) | (1 << EPEN);	// stall
 }
-ISR(USB_COM_vect)
-{
-	usb_com_vect();
-}
-
 
