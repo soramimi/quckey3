@@ -17,7 +17,7 @@ typedef struct Queue16 Queue;
 #define qput(Q,C) q16put(Q,C)
 #define qunget(Q,C) q16unget(Q,C)
 
-void led(uint8_t f);
+extern "C" void led(uint8_t f);
 void press_key(uint8_t key);
 void release_key(uint8_t key);
 void change_mouse(int dx, int dy, int dz, uint8_t buttons);
@@ -25,7 +25,7 @@ extern volatile uint8_t keyboard_leds;
 
 extern uint8_t interval_1ms_flag; // 1ms interval event
 
-enum MouseDeviceType {
+enum DeviceType {
 	Keyboard,
 	GenericMouse,
 	IntelliMouse_00000a,
@@ -167,7 +167,7 @@ struct PS2Device {
 
 	uint16_t real_device_id;
 	uint16_t fake_device_id;
-	MouseDeviceType mouse_device_type = Keyboard;
+	DeviceType device_type = Keyboard;
 	uint16_t const *init_sequece = nullptr;
 
 	uint16_t receive_timeout;
@@ -184,6 +184,8 @@ struct PS2Device {
 	uint16_t _device_id;
 	bool break_enable;
 	bool scan_enable;
+
+	int watchdog_timer = 0;
 };
 
 PS2KB0 ps2kb0io;
@@ -227,6 +229,7 @@ bool kb_next_output(PS2Device *dev, uint8_t c)
 	dev->io->set_clock_0();	// I/O inhibit, trigger interrupt
 	dev->io->set_data_0();	// start bit
 	sei();
+	wait_40us();
 	wait_40us();
 	dev->io->set_clock_1();
 
@@ -348,7 +351,7 @@ enum {
 	PS2_KEYBOARD_INIT = 0x0100,
 	PS2_MOUSE_INIT    = 0x0200,
 	PS2_NORMAL        = 0x0300,
-	PS2_WAIT	          = 0x0400,
+	PS2_READY	      = 0x0400,
 	PS2_ED            = 0x0500,
 };
 
@@ -358,6 +361,7 @@ enum {
 	EVENT_KEYMAKE				= 0x0200,
 	EVENT_KEYBREAK				= 0x0300,
 	EVENT_SEND_KB_INDICATOR		= 0x0400,
+	EVENT_WATCHDOG              = 0x0500,
 };
 
 void ps2_device_handler(PS2Device *k, bool timer_event_flag)
@@ -371,7 +375,18 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			if (k->reset_timer == 0) {
 				put_event(k, EVENT_INIT);
 			}
+		} else {
+			if (k->device_type == Keyboard) {
+				k->watchdog_timer++;
+				if (k->watchdog_timer == 1000 || k->watchdog_timer == 2000 || k->watchdog_timer == 3000) {
+					put_event(k, EVENT_WATCHDOG);
+				} else if (k->watchdog_timer >= 3500){
+					k->watchdog_timer = 0;
+					put_event(k, EVENT_INIT);
+				}
+			}
 		}
+
 		if (k->receive_timeout > 0) {
 			k->receive_timeout--;
 			if (k->receive_timeout == 0) {
@@ -393,7 +408,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 		}
 		sei();
 
-		if (k->mouse_device_type == Keyboard) {
+		if (k->device_type == Keyboard) {
 			uint8_t leds = 0;
 			if (keyboard_leds & 1) leds |= 2; // num lock
 			if (keyboard_leds & 2) leds |= 4; // caps lock
@@ -432,6 +447,10 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 				k->reset_timer = 500;
 			}
 			break;
+		case EVENT_WATCHDOG:
+			led(false);
+			kb_put(k, 0xee);
+			break;
 		}
 	}
 
@@ -440,6 +459,9 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 		uint16_t t;
 
 		k->receive_timeout = 0;
+
+		k->watchdog_timer = 0;
+		led(true);
 
 		if (k->init_sequece) {
 			while (1) {
@@ -451,10 +473,10 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 				switch (t) {
 				case EVENT(0):
 					if (k->mouse_buffer[0] == 0x00 && k->mouse_buffer[1] == 0x00 && k->mouse_buffer[2] == 0x0a) {
-						k->mouse_device_type = IntelliMouse_00000a;
+						k->device_type = IntelliMouse_00000a;
 						k->init_sequece = init_sequence_for_intellimouse_mouse;
 					} else if (k->mouse_buffer[0] == 0x19 && k->mouse_buffer[1] == 0x03 && k->mouse_buffer[2] == 0xc8) {
-						k->mouse_device_type = TrackManMarbleFX;
+						k->device_type = TrackManMarbleFX;
 						k->init_sequece = init_sequence_for_logitech_mouse;
 					} else {
 						UseDefaultMouse();
@@ -462,7 +484,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 					break;
 				case EVENT(1):
 					if (k->mouse_buffer[0] == 0x10 && k->mouse_buffer[1] == 0x00 && k->mouse_buffer[2] == 0x0a) {
-						k->mouse_device_type = IntelliMouse_10000a;
+						k->device_type = IntelliMouse_10000a;
 						k->init_sequece++;
 					} else {
 						UseDefaultMouse();
@@ -470,10 +492,10 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 					break;
 				case EVENT(2):
 					if (k->mouse_buffer[0] == 0x03) {
-						k->mouse_device_type = IntelliMouse;
+						k->device_type = IntelliMouse;
 						k->init_sequece++;
 					} else if (k->mouse_buffer[0] == 0x04) {
-						k->mouse_device_type = IntelliMouse;
+						k->device_type = IntelliMouse;
 						k->init_sequece++;
 					} else {
 						UseDefaultMouse();
@@ -502,7 +524,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			k->init_sequece++;
 			if (pgm_read_word(k->init_sequece) == 0) {
 				k->init_sequece = nullptr;
-				k->state = PS2_WAIT;
+				k->state = PS2_READY;
 			}
 			c = -1;
 		} else {
@@ -526,7 +548,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 				if (c == 0x00) { // mouse
 					k->real_device_id = 0;
 					k->fake_device_id = 0;
-					k->mouse_device_type = GenericMouse;
+					k->device_type = GenericMouse;
 					k->mouse_buffer[0] = 0;
 					k->mouse_buffer[1] = 0;
 					k->mouse_buffer[2] = 0;
@@ -580,18 +602,18 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 					}
 					c = -1;
 				}
-				k->state = PS2_WAIT;
+				k->state = PS2_READY;
 				break;
 			case PS2_ED:
 				if (c == 0xfa) {
 					kb_put(k, k->indicator);
-					k->state = PS2_WAIT;
+					k->state = PS2_READY;
 					c = -1;
 				} else {
 					k->state = PS2_NORMAL;
 				}
 				break;
-			case PS2_WAIT:
+			case PS2_READY:
 				k->reset_timer = 0;
 				k->scan_enable = true;
 				k->state = PS2_NORMAL;
@@ -607,7 +629,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			if (k->real_device_id == 0) { // mouse
 				k->receive_timeout = 10;
 				uint8_t len = 3;
-				if (k->mouse_device_type == IntelliMouse) {
+				if (k->device_type == IntelliMouse) {
 					len = 4;
 				}
 				if (k->mouse_received < len) {
@@ -616,7 +638,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 						int wheel_delta = 0;
 						uint8_t flags = k->mouse_buffer[0];
 						if (flags & 0xc0) {
-							if (k->mouse_device_type == TrackManMarbleFX && (flags & 0xc8) == 0xc8 && k->mouse_buffer[1] == 0xd2) {
+							if (k->device_type == TrackManMarbleFX && (flags & 0xc8) == 0xc8 && k->mouse_buffer[1] == 0xd2) {
 								k->mouse_buttons = (k->mouse_buttons & 0x07) | ((k->mouse_buffer[2] >> 1) & 0x08);
 							}
 						} else {
@@ -625,12 +647,12 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 							if (flags & 0x10) dx |= -1 << 8;
 							if (flags & 0x20) dy |= -1 << 8;
 							uint8_t buttons = 0;
-							if (k->mouse_device_type != TrackManMarbleFX) {
+							if (k->device_type != TrackManMarbleFX) {
 								k->mouse_buttons = flags & 0x07;
 								if (k->mouse_buttons & 0x01) buttons |= 0x01; // left
 								if (k->mouse_buttons & 0x02) buttons |= 0x02; // right
 								if (k->mouse_buttons & 0x04) buttons |= 0x04; // middle
-								if (k->mouse_device_type == IntelliMouse) {
+								if (k->device_type == IntelliMouse) {
 									k->mouse_buttons |= (k->mouse_buffer[3] >> 1) & 0x18;
 									if (k->mouse_buttons & 0x08) buttons |= 0x08; // middle
 									if (k->mouse_buttons & 0x10) buttons |= 0x10; // middle
@@ -641,7 +663,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 									wheel_delta = -wheel_delta;
 								}
 							}
-							if (k->mouse_device_type == TrackManMarbleFX) {
+							if (k->device_type == TrackManMarbleFX) {
 								k->mouse_buttons = (k->mouse_buttons & 0xf8) | (flags & 0x07);
 								if (k->mouse_buttons & 0x01) buttons |= 0x01; // left
 								if (k->mouse_buttons & 0x02) buttons |= 0x02; // right

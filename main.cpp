@@ -36,7 +36,7 @@ static unsigned short _scale = 0;
 //static unsigned long _system_tick_count;
 //static unsigned long _tick_count;
 //static unsigned long _time_s;
-static unsigned short _time_ms = 0;
+//static unsigned short _time_ms = 0;
 uint8_t interval_1ms_flag = 0;
 ISR(TIMER0_OVF_vect, ISR_NOBLOCK)
 {
@@ -45,11 +45,11 @@ ISR(TIMER0_OVF_vect, ISR_NOBLOCK)
 	if (_scale >= SCALE) {
 		_scale -= SCALE;
 //		_tick_count++;
-		_time_ms++;
-		if (_time_ms >= 1000) {
+//		_time_ms++;
+//		if (_time_ms >= 1000) {
 //			_time_ms = 0;
 //			_time_s++;
-		}
+//		}
 		interval_1ms_flag = 1;
 	}
 }
