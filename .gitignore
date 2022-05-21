@@ -4,3 +4,5 @@
 *.map
 *.eep
 *.user
+*.o
+quckey3.elf

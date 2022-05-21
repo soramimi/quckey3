@@ -48,8 +48,8 @@ extern uint8_t mouse_data[4];
 
 #define MAX_ENDPOINT 4
 
-#define LSB(n) (n & 255)
-#define MSB(n) ((n >> 8) & 255)
+#define LSB(n) ((n) & 255)
+#define MSB(n) (((n) >> 8) & 255)
 
 // ATmega32u2
 #if defined(__AVR_ATmega32U2__)

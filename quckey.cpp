@@ -448,8 +448,8 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			}
 			break;
 		case EVENT_WATCHDOG:
-			led(false);
 			kb_put(k, 0xee);
+//			led(false);
 			break;
 		}
 	}
@@ -461,7 +461,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 		k->receive_timeout = 0;
 
 		k->watchdog_timer = 0;
-		led(true);
+//		led(true);
 
 		if (k->init_sequece) {
 			while (1) {
@@ -563,32 +563,40 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			case PS2_KEYBOARD_INIT + 0:	// receive keyboard ID 2nd byte
 				k->_device_id |= c << 8;
 				k->real_device_id = k->_device_id;
-				kb_put(k, 0xf3);
+				// fallthru
+			case PS2_KEYBOARD_INIT + 1:
+			case PS2_KEYBOARD_INIT + 2:
+				kb_put(k, 0xf5);
 				k->state++;
 				c = -1;
 				break;
-			case PS2_KEYBOARD_INIT + 1:
+			case PS2_KEYBOARD_INIT + 3:
+				kb_put(k, 0xf3); // set typematic rate/delay
+				k->state++;
+				c = -1;
+				break;
+			case PS2_KEYBOARD_INIT + 4:
 				if (c == 0xfa) {
 					kb_put(k, 0x00);
 					k->state++;
 					c = -1;
 				}
 				break;
-			case PS2_KEYBOARD_INIT + 2:
+			case PS2_KEYBOARD_INIT + 5:
+			case PS2_KEYBOARD_INIT + 6:
+			case PS2_KEYBOARD_INIT + 7:
+				kb_put(k, 0xf4); // enable data reporting
+				k->state++;
+				c = -1;
+				break;
+			case PS2_KEYBOARD_INIT + 8:
 				if (c == 0xfa) {
-					kb_put(k, 0xf4); // enable data reporting
+					kb_put(k, 0xf0); // select alternate scan codes
 					k->state++;
 					c = -1;
 				}
 				break;
-			case PS2_KEYBOARD_INIT + 3:
-				if (c == 0xfa) {
-					kb_put(k, 0xf0);
-					k->state++;
-					c = -1;
-				}
-				break;
-			case PS2_KEYBOARD_INIT + 4:
+			case PS2_KEYBOARD_INIT + 9:
 				if (c == 0xfa) {
 					switch (k->real_device_id) {
 					case 0x92ab:	// is IBM5576-001 ?
@@ -603,6 +611,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 					c = -1;
 				}
 				k->state = PS2_READY;
+				put_event(k, EVENT_SEND_KB_INDICATOR);
 				break;
 			case PS2_ED:
 				if (c == 0xfa) {
@@ -644,8 +653,8 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 						} else {
 							int dx = k->mouse_buffer[1];
 							int dy = k->mouse_buffer[2];
-							if (flags & 0x10) dx |= -1 << 8;
-							if (flags & 0x20) dy |= -1 << 8;
+							if (flags & 0x10) dx |= 0xff00; // make negative
+							if (flags & 0x20) dy |= 0xff00;
 							uint8_t buttons = 0;
 							if (k->device_type != TrackManMarbleFX) {
 								k->mouse_buttons = flags & 0x07;
@@ -658,7 +667,7 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 									if (k->mouse_buttons & 0x10) buttons |= 0x10; // middle
 									wheel_delta = k->mouse_buffer[3] & 0x0f;
 									if (wheel_delta & 0x08) {
-										wheel_delta |= -1 << 4;
+										wheel_delta |= 0xfff0; // make negative
 									}
 									wheel_delta = -wheel_delta;
 								}
