@@ -171,5 +171,8 @@ clean:
 .PHONY : build hex eep end clean
 
 write: avr_keyboard.hex
+	avrdude -c avrisp -P /dev/ttyUSB0 -b 19200 -p m32u2 -U hfuse:w:0xd9:m -U lfuse:w:0x5e:m -U flash:w:avr_keyboard.hex
+
+write2:
 	ftavr -w avr_keyboard.hex --avr-write-fuse-e f4 --avr-write-fuse-h d9 --avr-write-fuse-l 5e
 
