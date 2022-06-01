@@ -6,3 +6,4 @@
 *.user
 *.o
 quckey3.elf
+.vscode/

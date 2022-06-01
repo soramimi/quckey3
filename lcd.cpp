@@ -2,6 +2,8 @@
 #include "avrgpio.h"
 #include "waitloop.h"
 
+#ifdef LCD_ENABLED
+
 #define LCD_ADDRESS 0x27
 #define LCD_CMD 0
 #define LCD_CHR 1
@@ -205,3 +207,4 @@ void lcd::init()
 	clear();
 }
 
+#endif // LCD_ENABLED

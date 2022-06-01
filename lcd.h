@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+//#define LCD_ENABLED
+
+#ifdef LCD_ENABLED
+
 #ifdef __cplusplus
 
 class lcd {
@@ -26,5 +30,7 @@ void lcd_puthex8(uint8_t v);
 #ifdef __cplusplus
 }
 #endif
+
+#endif // LCD_ENABLED
 
 #endif // LCD_H

@@ -36,7 +36,13 @@ clean:
 	rm -f *.hex
 
 write: $(TARGET).hex
+	avrdude -c avrisp -P /dev/ttyACM0 -b 19200 -p $(MCU) -U efuse:w:0xf4:m -U hfuse:w:0xd9:m -U lfuse:w:0x5e:m -U flash:w:$(TARGET).hex
+
+write2: $(TARGET).hex
 	avrdude -c avrisp -P /dev/ttyUSB0 -b 19200 -p $(MCU) -U efuse:w:0xf4:m -U hfuse:w:0xd9:m -U lfuse:w:0x5e:m -U flash:w:$(TARGET).hex
+
+fetch:
+	avrdude -c avrisp -P /dev/ttyACM0 -b 19200 -p $(MCU) -U efuse:r:-:h -U hfuse:r:-:h -U lfuse:r:-:h
 
 write2:
 	ftavr -w $(TARGET).hex --avr-write-fuse-e f4 --avr-write-fuse-h d9 --avr-write-fuse-l 5e

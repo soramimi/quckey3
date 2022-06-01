@@ -124,6 +124,8 @@ void press_key(uint8_t key)
 void keyboard_setup();
 void ps2_loop();
 
+#ifdef LCD_ENABLED
+
 enum {
 	LCD_NONE = 0,
 	LCD_HOME = 0x0c,
@@ -175,6 +177,8 @@ static uint8_t lcd_popfront()
 	return c;
 }
 
+#endif //  LCD_ENABLED
+
 void setup()
 {
 	// 16 MHz clock
@@ -186,6 +190,7 @@ void setup()
 	PORTC = 0x00;
 	DDRB = 0x01;
 	DDRC = 0x04;
+
 	TCCR0B = 0x02; // 1/8 prescaling
 	TIMSK0 |= 1 << TOIE0;
 
@@ -196,10 +201,12 @@ void setup()
 
 	keyboard_setup();
 
+#ifdef LCD_ENABLED
 	lcd::init();
 	lcd::clear();
 	lcd::home();
-//	lcd_print("Quckey3");
+	lcd_print("Quckey3");
+#endif
 
 	led(1);
 }
@@ -214,6 +221,7 @@ int main()
 	setup();
 	sei();
 	while (1) {
+#ifdef LCD_ENABLED
 		uint8_t c = lcd_popfront();
 		if (c == LCD_NONE) {
 			loop();
@@ -224,6 +232,9 @@ int main()
 		} else {
 			lcd::putchar(c);
 		}
+#else
+		loop();
+#endif
 	}
 }
 

@@ -400,11 +400,11 @@ static inline void usb_ack_out()
 	UEINTX = ~(1 << RXOUTI);
 }
 
-static inline void usb_flush(uint8_t ep)
+static inline void usb_flush_rx(uint8_t ep)
 {
 	UENUM = ep;
 	if (UEBCLX != 0) {
-		release_tx();
+		release_rx();
 	}
 }
 
@@ -425,7 +425,7 @@ static inline void usb_gen_vect()
 		usb_configuration = 0;
 	}
 	if (udint & (1 << SOFI)) {
-//		usb_flush(TX_EP);
+//		usb_flush_rx(DATA_IN_EP);
 	}
 	if (udint & (1 << WAKEUPI)) {
 		UDIEN = (UDIEN & ~(1 << WAKEUPE)) | (1 << SUSPE);

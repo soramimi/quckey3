@@ -560,43 +560,38 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 				}
 				c = -1;
 				break;
-			case PS2_KEYBOARD_INIT + 0:	// receive keyboard ID 2nd byte
+			case PS2_KEYBOARD_INIT:	// receive keyboard ID 2nd byte
 				k->_device_id |= c << 8;
 				k->real_device_id = k->_device_id;
-				// fallthru
-			case PS2_KEYBOARD_INIT + 1:
-			case PS2_KEYBOARD_INIT + 2:
 				kb_put(k, 0xf5);
 				k->state++;
 				c = -1;
 				break;
-			case PS2_KEYBOARD_INIT + 3:
+			case PS2_KEYBOARD_INIT + 1:
 				kb_put(k, 0xf3); // set typematic rate/delay
 				k->state++;
 				c = -1;
 				break;
-			case PS2_KEYBOARD_INIT + 4:
+			case PS2_KEYBOARD_INIT + 2:
 				if (c == 0xfa) {
 					kb_put(k, 0x00);
 					k->state++;
 					c = -1;
 				}
 				break;
-			case PS2_KEYBOARD_INIT + 5:
-			case PS2_KEYBOARD_INIT + 6:
-			case PS2_KEYBOARD_INIT + 7:
+			case PS2_KEYBOARD_INIT + 3:
 				kb_put(k, 0xf4); // enable data reporting
 				k->state++;
 				c = -1;
 				break;
-			case PS2_KEYBOARD_INIT + 8:
+			case PS2_KEYBOARD_INIT + 4:
 				if (c == 0xfa) {
 					kb_put(k, 0xf0); // select alternate scan codes
 					k->state++;
 					c = -1;
 				}
 				break;
-			case PS2_KEYBOARD_INIT + 9:
+			case PS2_KEYBOARD_INIT + 5:
 				if (c == 0xfa) {
 					switch (k->real_device_id) {
 					case 0x92ab:	// is IBM5576-001 ?
