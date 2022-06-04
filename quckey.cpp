@@ -184,8 +184,6 @@ struct PS2Device {
 	uint16_t _device_id;
 	bool break_enable;
 	bool scan_enable;
-
-	int watchdog_timer = 0;
 };
 
 PS2KB0 ps2kb0io;
@@ -361,7 +359,6 @@ enum {
 	EVENT_KEYMAKE				= 0x0200,
 	EVENT_KEYBREAK				= 0x0300,
 	EVENT_SEND_KB_INDICATOR		= 0x0400,
-	EVENT_WATCHDOG              = 0x0500,
 };
 
 void ps2_device_handler(PS2Device *k, bool timer_event_flag)
@@ -374,16 +371,6 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 			k->reset_timer--;
 			if (k->reset_timer == 0) {
 				put_event(k, EVENT_INIT);
-			}
-		} else {
-			if (k->device_type == Keyboard) {
-				k->watchdog_timer++;
-				if (k->watchdog_timer == 1000 || k->watchdog_timer == 2000 || k->watchdog_timer == 3000) {
-					put_event(k, EVENT_WATCHDOG);
-				} else if (k->watchdog_timer >= 3500){
-					k->watchdog_timer = 0;
-					put_event(k, EVENT_INIT);
-				}
 			}
 		}
 
@@ -447,10 +434,6 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 				k->reset_timer = 500;
 			}
 			break;
-		case EVENT_WATCHDOG:
-			kb_put(k, 0xee);
-//			led(false);
-			break;
 		}
 	}
 
@@ -459,9 +442,6 @@ void ps2_device_handler(PS2Device *k, bool timer_event_flag)
 		uint16_t t;
 
 		k->receive_timeout = 0;
-
-		k->watchdog_timer = 0;
-//		led(true);
 
 		if (k->init_sequece) {
 			while (1) {
