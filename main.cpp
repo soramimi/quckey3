@@ -54,6 +54,8 @@ ISR(TIMER0_OVF_vect, ISR_NOBLOCK)
 	}
 }
 
+static bool led_status = false;
+
 extern "C" void led(uint8_t f)
 {
 	if (f) {
@@ -61,6 +63,12 @@ extern "C" void led(uint8_t f)
 	} else {
 		PORTB &= ~0x01;
 	}
+	led_status = f;
+}
+
+extern "C" void led_toggle()
+{
+	led(!led_status);
 }
 
 static int8_t clamp(int v, int8_t min, int8_t max)
@@ -121,7 +129,7 @@ void press_key(uint8_t key)
 	usb_keyboard_send();
 }
 
-void keyboard_setup();
+void ps2_setup();
 void ps2_loop();
 
 #ifdef LCD_ENABLED
@@ -199,7 +207,7 @@ void setup()
 		msleep(10);
 	}
 
-	keyboard_setup();
+	ps2_setup();
 
 #ifdef LCD_ENABLED
 	lcd::init();
@@ -208,7 +216,7 @@ void setup()
 	lcd_print("Quckey3");
 #endif
 
-	led(1);
+	led(0);
 }
 
 void loop()
@@ -237,4 +245,3 @@ int main()
 #endif
 	}
 }
-
