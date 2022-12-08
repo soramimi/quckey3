@@ -109,8 +109,21 @@ void clear_key(uint8_t key)
 	}
 }
 
+bool caps_flag = false;
+int caps_timeouts[] = { 0, 0 };
+uint8_t caps_instead = 0;
+
 void release_key(uint8_t key)
 {
+	if (key == 0x39) { // caps lock
+		caps_flag = false;
+		clear_key(caps_instead);
+		caps_instead = 0;
+	}
+	if (key == 0x39 || key == 0x51) { // down arrow
+		clear_key(0x65); // app
+	}
+
 	clear_key(key);
 	keyboard_data[1] = 0;
 	usb_keyboard_send();
@@ -118,6 +131,29 @@ void release_key(uint8_t key)
 
 void press_key(uint8_t key)
 {
+	if (key == 0x39) {
+		caps_flag = true;
+	} else if (caps_flag) {
+		if (key == 0x51) { // down arrow
+			key = 0x65; // app
+		} else {
+			return;
+		}
+	}
+	if (key == 0x39 && !(keyboard_data[0] & 0x22)) { // caps lock
+		if (caps_timeouts[1] > 0) {
+			clear_key(key);
+			key = 0xe3; // left win
+			caps_instead = key;
+		}
+		caps_timeouts[1] = caps_timeouts[0];
+		caps_timeouts[0] = 1000;
+	} else {
+		clear_key(caps_instead);
+		caps_timeouts[0] = 0;
+		caps_timeouts[1] = 0;
+	}
+
 	if (key >= 0xe0 && key < 0xe8) {
 		keyboard_data[0] |= 1 << (key - 0xe0);
 	} else if (key > 0) {
@@ -130,7 +166,7 @@ void press_key(uint8_t key)
 }
 
 void ps2_setup();
-void ps2_loop();
+void ps2_loop(bool timerevent);
 
 #ifdef LCD_ENABLED
 
@@ -221,7 +257,17 @@ void setup()
 
 void loop()
 {
-	ps2_loop();
+	cli();
+	bool timerevent = interval_1ms_flag;
+	interval_1ms_flag = false;
+	sei();
+
+	if (timerevent) {
+		if (caps_timeouts[0] > 0) caps_timeouts[0]--;
+		if (caps_timeouts[1] > 0) caps_timeouts[1]--;
+	}
+
+	ps2_loop(timerevent);
 }
 
 int main()

@@ -32,7 +32,7 @@ public:
 };
 
 
-class PS2KB0 : public AbstractPS2IO {
+class PS2IO_A : public AbstractPS2IO {
 public:
 	void set_clock_0() override
 	{
@@ -61,7 +61,7 @@ public:
 };
 
 
-class PS2KB1 : public AbstractPS2IO {
+class PS2IO_B : public AbstractPS2IO {
 public:
 	void set_clock_0() override
 	{

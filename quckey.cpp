@@ -24,8 +24,6 @@ void release_key(uint8_t key);
 void change_mouse(int dx, int dy, int dz, uint8_t buttons);
 extern volatile uint8_t keyboard_leds;
 
-extern uint8_t interval_1ms_flag; // 1ms interval event
-
 enum {
 	I_CHECK = 0x100,
 	I_SEND = 0x200,
@@ -202,11 +200,11 @@ static inline bool is_mouse(PS2Device const *k)
 }
 
 
-PS2KB0 ps2kb0io;
-PS2KB1 ps2kb1io;
+PS2IO_A ps2_a_io;
+PS2IO_B ps2_b_io;
 
-PS2Device ps2k0;
-PS2Device ps2k1;
+PS2Device ps2_a;
+PS2Device ps2_b;
 
 uint8_t countbits(uint16_t c)
 {
@@ -344,12 +342,12 @@ void intr(PS2Device *dev)
 
 ISR(INT0_vect)
 {
-	intr(&ps2k0);
+	intr(&ps2_a);
 }
 
 ISR(INT5_vect)
 {
-	intr(&ps2k1);
+	intr(&ps2_b);
 }
 
 //
@@ -843,8 +841,8 @@ void setup_device(PS2Device *dev)
 
 void ps2_setup()
 {
-	ps2k0.io = &ps2kb0io;
-	ps2k1.io = &ps2kb1io;
+	ps2_a.io = &ps2_a_io;
+	ps2_b.io = &ps2_b_io;
 
 	PORTD = 0;
 	DDRD = 0xaa;
@@ -853,22 +851,17 @@ void ps2_setup()
 	EICRA = 0x01;
 	EICRB = 0x04;
 
-	setup_device(&ps2k0);
-	setup_device(&ps2k1);
+	setup_device(&ps2_a);
+	setup_device(&ps2_b);
 }
 
-void ps2_loop()
+void ps2_loop(bool timerevent)
 {
-	cli();
-	bool timerevent = interval_1ms_flag;
-	interval_1ms_flag = false;
-	sei();
+	ps2_device_handler(&ps2_a, timerevent);
+	ps2_device_handler(&ps2_b, timerevent);
 
-	ps2_device_handler(&ps2k0, timerevent);
-	ps2_device_handler(&ps2k1, timerevent);
-
-	ps2_io_handler(&ps2k0);
-	ps2_io_handler(&ps2k1);
+	ps2_io_handler(&ps2_a);
+	ps2_io_handler(&ps2_b);
 }
 
 
