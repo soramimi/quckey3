@@ -131,27 +131,30 @@ void release_key(uint8_t key)
 
 void press_key(uint8_t key)
 {
-	if (key == 0x39) {
-		caps_flag = true;
-	} else if (caps_flag) {
-		if (key == 0x51) { // down arrow
-			key = 0x65; // app
-		} else {
-			return;
-		}
-	}
-	if (key == 0x39 && !(keyboard_data[0] & 0x22)) { // caps lock
+	if (key == 0x39 && !(keyboard_data[0] & 0x22)) { // caps lock && not shift
 		if (caps_timeouts[1] > 0) {
 			clear_key(key);
 			key = 0xe3; // left win
 			caps_instead = key;
 		}
-		caps_timeouts[1] = caps_timeouts[0];
+		if (!caps_flag && caps_timeouts[0] < 990) {
+			auto t = caps_timeouts[0];
+			if (t > 0 && t < 10) {
+				t = 10;
+			}
+			caps_timeouts[1] = t;
+		}
 		caps_timeouts[0] = 1000;
 	} else {
-		clear_key(caps_instead);
 		caps_timeouts[0] = 0;
 		caps_timeouts[1] = 0;
+	}
+	if (key == 0x39) {
+		caps_flag = true;
+	} else if (caps_flag) {
+		if (key == 0x51) { // down arrow
+			key = 0x65; // app
+		}
 	}
 
 	if (key >= 0xe0 && key < 0xe8) {
