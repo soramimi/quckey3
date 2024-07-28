@@ -112,6 +112,18 @@ void clear_key(uint8_t key)
 bool caps_flag = false;
 int caps_timeouts[] = { 0, 0 };
 uint8_t caps_instead = 0;
+uint8_t muhenkan_flag = 0;
+
+enum HID_Modifire_Mask {
+	L_CTRL = 0x01,
+	L_SHIFT = 0x02,
+	L_ALT = 0x04,
+	L_GUI = 0x08,
+	R_CTRL = 0x10,
+	R_SHIFT = 0x20,
+	R_ALT = 0x40,
+	R_GUI = 0x80,
+};
 
 void release_key(uint8_t key)
 {
@@ -120,18 +132,33 @@ void release_key(uint8_t key)
 		clear_key(caps_instead);
 		caps_instead = 0;
 	}
+
 	if (key == 0x39 || key == 0x51) { // down arrow
 		clear_key(0x65); // app
+	}
+
+	if (muhenkan_flag) {
+		clear_key(0x28); // enter
+		clear_key(0x8b); // muhenkan
 	}
 
 	clear_key(key);
 	keyboard_data[1] = 0;
 	usb_keyboard_send();
+
+	muhenkan_flag = 0;
+}
+
+void push_key(uint8_t key)
+{
+	clear_key(key);
+	memmove(keyboard_data + 3, keyboard_data + 2, 5);
+	keyboard_data[2] = key;
 }
 
 void press_key(uint8_t key)
 {
-	if (key == 0x39 && !(keyboard_data[0] & 0x22)) { // caps lock && not shift
+	if (key == 0x39 && !(keyboard_data[0] & (L_SHIFT | R_SHIFT))) { // caps lock && not shift
 		if (caps_timeouts[1] > 0) {
 			clear_key(key);
 			key = 0xe3; // left win
@@ -149,6 +176,7 @@ void press_key(uint8_t key)
 		caps_timeouts[0] = 0;
 		caps_timeouts[1] = 0;
 	}
+
 	if (key == 0x39) {
 		caps_flag = true;
 	} else if (caps_flag) {
@@ -159,10 +187,18 @@ void press_key(uint8_t key)
 
 	if (key >= 0xe0 && key < 0xe8) {
 		keyboard_data[0] |= 1 << (key - 0xe0);
-	} else if (key > 0) {
-		clear_key(key);
-		memmove(keyboard_data + 3, keyboard_data + 2, 5);
-		keyboard_data[2] = key;
+	} else if (key == 0x8b && keyboard_data[0] == 0) { // muhenkan && no modifiers
+		muhenkan_flag = 1;
+		push_key(0x28); // enter
+	} else {
+		if (muhenkan_flag) {
+			clear_key(0x28); // enter
+			clear_key(0x8b); // muhenkan
+			muhenkan_flag = 0;
+		}
+		if (key > 0) {
+			push_key(key);
+		}
 	}
 	keyboard_data[1] = 0;
 	usb_keyboard_send();
