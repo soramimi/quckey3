@@ -109,8 +109,9 @@ void clear_key(uint8_t key)
 	}
 }
 
-bool caps_flag = false;
-int caps_timeouts[] = { 0, 0 };
+bool caps_pressed = false;
+int caps_timeout = 0;
+int caps_count = 0;
 uint8_t caps_instead = 0;
 uint8_t muhenkan_flag = 0;
 
@@ -128,13 +129,14 @@ enum HID_Modifire_Mask {
 void release_key(uint8_t key)
 {
 	if (key == 0x39) { // caps lock
-		caps_flag = false;
-		clear_key(caps_instead);
-		caps_instead = 0;
-	}
-
-	if (key == 0x39 || key == 0x51) { // down arrow
-		clear_key(0x65); // app
+		if (caps_timeout < 990) {
+			caps_pressed = false;
+			caps_timeout = 0;
+			clear_key(caps_instead);
+			caps_instead = 0;
+		} else {
+			key = 0;
+		}
 	}
 
 	if (muhenkan_flag) {
@@ -158,30 +160,42 @@ void push_key(uint8_t key)
 
 void press_key(uint8_t key)
 {
-	if (key == 0x39 && !(keyboard_data[0] & (L_SHIFT | R_SHIFT))) { // caps lock && not shift
-		if (caps_timeouts[1] > 0) {
-			clear_key(key);
-			key = 0xe3; // left win
-			caps_instead = key;
-		}
-		if (!caps_flag && caps_timeouts[0] < 990) {
-			auto t = caps_timeouts[0];
-			if (t > 0 && t < 10) {
-				t = 10;
+	if (key == 0x39) { // caps lock
+		if (caps_pressed) {
+			key = 0;
+		} else {
+			caps_pressed = true;
+			caps_timeout = 1000;
+			if (caps_count < 2) {
+				caps_count++;
+				key = 0;
+			} else {
+				key = 0x39;
 			}
-			caps_timeouts[1] = t;
 		}
-		caps_timeouts[0] = 1000;
 	} else {
-		caps_timeouts[0] = 0;
-		caps_timeouts[1] = 0;
-	}
+		caps_timeout = 0;
+		caps_count = 0;
 
-	if (key == 0x39) {
-		caps_flag = true;
-	} else if (caps_flag) {
-		if (key == 0x51) { // down arrow
-			key = 0x65; // app
+		clear_key(caps_instead);
+		caps_instead = 0;
+
+		if (caps_pressed) {
+			if (key == 0x04) { // A
+				key = 0x65; // app
+			} else if (key == 0x1a) { // W
+				key = 0xe3; // left win
+#if 0 // something is wrong with the auto-repeat behavior
+			} else if (key >= 0x3a && key <= 0x45) { // F1-F12
+				key += 0x68 - 0x3a; // F13-F24
+#endif
+			} else {
+				key = 0;
+			}
+			if (key != 0) {
+				clear_key(0x39); // caps lock
+				caps_instead = key;
+			}
 		}
 	}
 
@@ -302,8 +316,7 @@ void loop()
 	sei();
 
 	if (timerevent) {
-		if (caps_timeouts[0] > 0) caps_timeouts[0]--;
-		if (caps_timeouts[1] > 0) caps_timeouts[1]--;
+		if (caps_timeout > 0) caps_timeout--;
 	}
 
 	ps2_loop(timerevent);
