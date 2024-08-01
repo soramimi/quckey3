@@ -132,6 +132,8 @@ void release_key(uint8_t key)
 		if (caps_timeout < 990) {
 			caps_pressed = false;
 			caps_timeout = 0;
+			clear_key(0x39); // caps lock
+			clear_key(0xe3); // left win
 			clear_key(caps_instead);
 			caps_instead = 0;
 		} else {
@@ -170,6 +172,7 @@ void press_key(uint8_t key)
 				caps_count++;
 				key = 0;
 			} else {
+				caps_count = 0;
 				key = 0x39;
 			}
 		}
@@ -177,23 +180,14 @@ void press_key(uint8_t key)
 		caps_timeout = 0;
 		caps_count = 0;
 
-		clear_key(caps_instead);
-		caps_instead = 0;
-
 		if (caps_pressed) {
-			if (key == 0x04) { // A
-				key = 0x65; // app
-			} else if (key == 0x1a) { // W
+			if (key == 0x1a) { // W
 				key = 0xe3; // left win
-#if 0 // something is wrong with the auto-repeat behavior
-			} else if (key >= 0x3a && key <= 0x45) { // F1-F12
-				key += 0x68 - 0x3a; // F13-F24
-#endif
 			} else {
-				key = 0;
-			}
-			if (key != 0) {
-				clear_key(0x39); // caps lock
+				clear_key(caps_instead);
+				if (key == 0x04) { // A
+					key = 0x65; // app
+				}
 				caps_instead = key;
 			}
 		}
