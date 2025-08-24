@@ -195,7 +195,7 @@ void press_key(uint8_t key)
 
 	if (key >= 0xe0 && key < 0xe8) {
 		keyboard_data[0] |= 1 << (key - 0xe0);
-	} else if (key == 0x8b && keyboard_data[0] == 0) { // muhenkan && no modifiers
+	} else if (key == 0x8b && caps_pressed) { // muhenkan && caps lock pressed
 		muhenkan_flag = 1;
 		push_key(0x28); // enter
 	} else {
